@@ -46,5 +46,6 @@ PLAN.md, potem pisz kod.
 ## Stan projektu
 
 - Repo na GitHub: `DomienGit/PapuTrain` (branch `main`), skonfigurowane remote.
-- Zrobione: PLAN.md (pełna specyfikacja), CLAUDE.md. Kod: brak — start od Etapu 0.
+- Zrobione: PLAN.md (pełna specyfikacja), Etap 0 (szkielet FastAPI), Etap 1 (baza SQLModel, 6 tabel, katalog ćwiczeń JSON, CRUD: profil/sprzęt/katalog).
+- Następny: Etap 2 (logowanie JWT + bcrypt).
 - Otwarte pytanie z planu: domena na VPS (wpływa tylko na Etap 10).
