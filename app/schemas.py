@@ -90,6 +90,19 @@ class AskAiRequest(SQLModel):
     request: str = Field(min_length=1, max_length=1000)
 
 
+class WorkoutDoneUpdate(SQLModel):
+    """Odhaczenie treningu w aktywnym planie (data wykonania ustawia serwer)."""
+
+    done: bool
+
+
+class ExerciseFeedbackUpdate(SQLModel):
+    """Ocena wykonania (1-5) i uwaga do ćwiczenia w aktywnym planie."""
+
+    rating: int | None = Field(default=None, ge=1, le=5)
+    note: str | None = Field(default=None, max_length=500)
+
+
 class LoginRequest(SQLModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)

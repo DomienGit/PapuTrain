@@ -5,6 +5,8 @@ Zasady (PLAN.md): szkic zawsze maksymalnie jeden (nowy nadpisuje stary),
 generowanie zablokowane, dopóki aktywny plan ma nieodhaczone treningi.
 """
 
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
 from sqlmodel import select
@@ -17,7 +19,15 @@ from app.ai import (
 )
 from app.database import SessionDep
 from app.models import CatalogExercise, Equipment, Exercise, Plan, Profile, Workout
-from app.schemas import AiPlan, AiWorkout, AskAiRequest, ExerciseUpdate, WorkoutUpdate
+from app.schemas import (
+    AiPlan,
+    AiWorkout,
+    AskAiRequest,
+    ExerciseFeedbackUpdate,
+    ExerciseUpdate,
+    WorkoutDoneUpdate,
+    WorkoutUpdate,
+)
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 
@@ -106,11 +116,19 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
     if profile is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Najpierw uzupełnij profil w kreatorze")
 
+    # Poprzedni plan z wynikami (oceny, uwagi, daty) — AI progresuje na jego bazie.
+    history = None
+    if active is not None:
+        workouts = session.exec(
+            select(Workout).where(Workout.plan_id == active.id).order_by(Workout.number)  # type: ignore[arg-type]
+        ).all()
+        history = [(w, _workout_exercises(session, w)) for w in workouts]
+
     equipment = list(session.exec(select(Equipment).where(Equipment.owned)).all())  # type: ignore[arg-type]
     catalog = list(session.exec(select(CatalogExercise)).all())
     week_number = max((p.week_number for p in session.exec(select(Plan)).all()), default=0) + 1
 
-    prompt = build_generation_prompt(profile, equipment, catalog, week_number)
+    prompt = build_generation_prompt(profile, equipment, catalog, week_number, history)
     try:
         raw = generate_plan(prompt)
         plan_data = AiPlan.model_validate(raw)
@@ -324,3 +342,51 @@ def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: Sessi
     _register_ai_exercises(session, [workout_data])
     session.commit()
     return _plan_to_dict(session, draft)
+
+
+# --- Etap 7: trening na żywo (odhaczanie, oceny wykonania, uwagi) ---
+
+def _get_active_or_404(session) -> Plan:
+    active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
+    if active is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak aktywnego planu")
+    return active
+
+
+def _get_active_workout_or_404(session, workout_id: int) -> Workout:
+    """Trening aktywnego planu o podanym id (404, gdy nie istnieje lub cudzy plan)."""
+    workout = session.get(Workout, workout_id)
+    if workout is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego treningu")
+    if workout.plan_id != _get_active_or_404(session).id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten trening nie należy do aktywnego planu")
+    return workout
+
+
+@router.patch("/active/workouts/{workout_id}")
+def set_workout_done(workout_id: int, data: WorkoutDoneUpdate, session: SessionDep) -> dict:
+    """Odhaczenie treningu. Data wykonania = dziś (AI widzi realny rytm — PLAN.md req 9)."""
+    workout = _get_active_workout_or_404(session, workout_id)
+    workout.done = data.done
+    workout.completed_date = date.today() if data.done else None
+    session.add(workout)
+    session.commit()
+    return _plan_to_dict(session, session.get(Plan, workout.plan_id))
+
+
+@router.patch("/active/workouts/{workout_id}/exercises/{exercise_id}")
+def set_exercise_feedback(
+    workout_id: int, exercise_id: int, data: ExerciseFeedbackUpdate, session: SessionDep
+) -> dict:
+    """Ocena wykonania (1-5) i uwaga do ćwiczenia — idą do AI przy kolejnym tygodniu."""
+    workout = _get_active_workout_or_404(session, workout_id)
+    exercise = session.get(Exercise, exercise_id)
+    if exercise is None or exercise.workout_id != workout_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
+    if data.rating is not None:
+        exercise.rating = data.rating
+    if data.note is not None:
+        exercise.note = data.note
+    session.add(exercise)
+    session.commit()
+    return _plan_to_dict(session, session.get(Plan, workout.plan_id))

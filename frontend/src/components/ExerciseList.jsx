@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import Stars from './Stars'
 
 const sourceBadge = {
   builtin: '',
@@ -36,6 +37,20 @@ export default function ExerciseList({ ownedNames, allowAdd = false }) {
       const updated = await api(`/api/exercises/${item.id}`, {
         method: 'PUT',
         body: JSON.stringify({ chosen: !item.chosen }),
+      })
+      setItems(items.map((i) => (i.id === updated.id ? updated : i)))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // Ocena preferencji 1-5 (PLAN.md req 19/Etap 7): AI preferuje 4-5, pomija 1-2.
+  async function rate(item, rating) {
+    setError('')
+    try {
+      const updated = await api(`/api/exercises/${item.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ preference_rating: rating }),
       })
       setItems(items.map((i) => (i.id === updated.id ? updated : i)))
     } catch (err) {
@@ -145,6 +160,14 @@ export default function ExerciseList({ ownedNames, allowAdd = false }) {
                   sprzęt: {item.required_equipment.join(', ')}
                 </p>
               )}
+              <div className="mt-1 flex items-center gap-2 pl-8">
+                <Stars
+                  value={item.preference_rating}
+                  onChange={(n) => rate(item, n)}
+                  label={`preferencja: ${item.name}`}
+                />
+                <span className="text-xs text-zinc-400">preferencja</span>
+              </div>
             </li>
           ))}
         </ul>

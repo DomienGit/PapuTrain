@@ -71,11 +71,33 @@ def _catalog_lines(catalog: list[CatalogExercise]) -> list[str]:
     return lines
 
 
+def _history_lines(history: list[tuple[Workout, list[Exercise]]]) -> list[str]:
+    """Zrzuca poprzedni plan z wykonaniami, ocenami i uwagami do prompta."""
+    lines = []
+    for workout, exercises in history:
+        if workout.done and workout.completed_date:
+            status = f"wykonany: {workout.completed_date.isoformat()}"
+        else:
+            status = "NIE wykonany"
+        lines.append(f"- {workout.name} ({status}):")
+        for ex in exercises:
+            parts = [f"{ex.name} {ex.sets} × {ex.reps}"]
+            if ex.rest_between_sets_s is not None:
+                parts.append(f"przerwa {ex.rest_between_sets_s} s")
+            if ex.rating is not None:
+                parts.append(f"ocena wykonania: {ex.rating}/5")
+            if ex.note:
+                parts.append(f"uwaga: {ex.note}")
+            lines.append("  - " + ", ".join(parts))
+    return lines
+
+
 def build_generation_prompt(
     profile: Profile,
     equipment: list[Equipment],
     catalog: list[CatalogExercise],
     week_number: int,
+    history: list[tuple[Workout, list[Exercise]]] | None = None,
 ) -> str:
     """Składa instrukcję dla Gemini z profilu, sprzętu i katalogu ćwiczeń."""
     gym = _has_gym(equipment)
@@ -111,24 +133,39 @@ def build_generation_prompt(
     cat_lines = _catalog_lines(catalog)
     body.extend(cat_lines if cat_lines else "- (katalog pusty — zaproponuj sam)")
 
+    if history:
+        body.append("")
+        body.append("POPRZEDNI PLAN I WYNIKI (kontekst do progresji):")
+        body.extend(_history_lines(history))
+
+    rules = [
+        f"1. Wygeneruj DOKŁADNIE {profile.workouts_per_week} treningów ponumerowanych "
+        '"Trening 1", "Trening 2" itd. — BEZ przypisywania do dni tygodnia.',
+        "2. Używaj WYŁĄCZNIE ćwiczeń wykonalnych bez sprzętu, z domowymi zamiennikami "
+        "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
+        "pełnego dostępu do siłowni.",
+        "3. Każdy trening powinien dać się wykonać w podanym czasie.",
+        "4. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach). "
+        "Progresja może polegać także na skróceniu przerw (ćwiczenia za łatwe) "
+        "lub ich wydłużeniu (za trudne).",
+        "5. Ćwiczenia ocenione 4-5/5 preferuj, ocenione 1-2/5 pomiń. Ćwiczenia wybrane "
+        "traktuj jako preferencje — resztę dobierz tak, żeby plan był sensowny całościowo.",
+        "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+        f"7. Tytuł tygodnia: \"Tydzień {week_number}\".",
+        "8. Wszystkie teksty (nazwy treningów, uwagi, notatka trenera) po polsku.",
+    ]
+    if history:
+        rules.append(
+            "9. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5) "
+            "i uwagami. Oceny 4-5 = szło dobrze/za łatwo: progresuj (więcej serii/powtórzeń, "
+            "krótsze przerwy albo trudniejsza wersja ćwiczenia). Oceny 1-2 = za trudne: "
+            "zmniejsz trudność lub zamień ćwiczenie. Uwagi (np. ból stawu) respektuj."
+        )
+
+    body.extend(["", "TWARDE ZASADY:"])
+    body.extend(rules)
     body.extend(
         [
-            "",
-            "TWARDE ZASADY:",
-            f"1. Wygeneruj DOKŁADNIE {profile.workouts_per_week} treningów ponumerowanych "
-            '"Trening 1", "Trening 2" itd. — BEZ przypisywania do dni tygodnia.',
-            "2. Używaj WYŁĄCZNIE ćwiczeń wykonalnych bez sprzętu, z domowymi zamiennikami "
-            "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
-            "pełnego dostępu do siłowni.",
-            "3. Każdy trening powinien dać się wykonać w podanym czasie.",
-            "4. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach). "
-            "Progresja może polegać także na skróceniu przerw (ćwiczenia za łatwe) "
-            "lub ich wydłużeniu (za trudne).",
-            "5. Ćwiczenia ocenione 4-5/5 preferuj, ocenione 1-2/5 pomiń. Ćwiczenia wybrane "
-            "traktuj jako preferencje — resztę dobierz tak, żeby plan był sensowny całościowo.",
-            "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
-            f"7. Tytuł tygodnia: \"Tydzień {week_number}\".",
-            "8. Wszystkie teksty (nazwy treningów, uwagi, notatka trenera) po polsku.",
             "",
             "ODPOWIEDŹ: zwróć WYŁĄCZNIE poprawny JSON (bez komentarzy i markdown) "
             "dokładnie w tej strukturze:",

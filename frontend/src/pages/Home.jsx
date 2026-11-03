@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import DraftPanel from '../components/DraftPanel'
+import Stars from '../components/Stars'
 
 /**
- * Ekran główny. Pokazuje aktywny plan, szkic (panel edycji/zatwierdzania
- * z Etapu 6) albo przycisk "Generuj plan", gdy planu nie ma wcale.
+ * Ekran główny. Trzy stany (PLAN.md ekran 4 i 6):
+ * - szkic → DraftPanel (edycja, zatwierdzanie),
+ * - plan aktywny → widok "na żywo": odhaczanie treningów, oceny 1-5,
+ *   uwagi do ćwiczeń, "Generuj następny tydzień" (zablokowany do odhaczenia),
+ * - brak planu → przycisk "Generuj plan".
  */
 export default function Home({ username }) {
   const [plan, setPlan] = useState(null) // null = brak planu; {status, workouts...}
@@ -51,7 +55,7 @@ export default function Home({ username }) {
         plan.status === 'draft' ? (
           <DraftPanel plan={plan} onChange={setPlan} onRejected={() => setPlan(null)} />
         ) : (
-          <PlanView plan={plan} />
+          <PlanView plan={plan} onGenerate={generate} generating={busy} />
         )
       ) : loaded ? (
         <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-sm">
@@ -73,7 +77,22 @@ export default function Home({ username }) {
   )
 }
 
-function PlanView({ plan }) {
+function PlanView({ plan, onGenerate, generating }) {
+  const [error, setError] = useState('')
+
+  // Wspólny helper PATCH dla odhaczania i ocen — zwraca odświeżony plan.
+  async function patchPlan(path, body) {
+    setError('')
+    try {
+      return await api(path, { method: 'PATCH', body: JSON.stringify(body) })
+    } catch (err) {
+      setError(err.message)
+      return null
+    }
+  }
+
+  const undone = plan.workouts.filter((w) => !w.done).length
+
   return (
     <div className="mt-4">
       <h2 className="text-lg font-bold text-zinc-900">
@@ -87,36 +106,140 @@ function PlanView({ plan }) {
         </p>
       )}
 
+      {error && (
+        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+
       <div className="mt-3 space-y-4">
         {plan.workouts.map((workout) => (
-          <section key={workout.id} className="rounded-xl bg-white p-4 shadow-sm">
-            <h3 className="font-semibold text-zinc-900">
-              {workout.name}
-              {workout.rest_between_exercises_s != null && (
-                <span className="ml-2 text-xs font-normal text-zinc-500">
-                  przerwa między ćwiczeniami: {workout.rest_between_exercises_s} s
-                </span>
-              )}
-            </h3>
-            <ul className="mt-3 divide-y divide-zinc-100">
-              {workout.exercises.map((exercise) => (
-                <li key={exercise.id} className="py-2">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-zinc-900">{exercise.name}</span>
-                    <span className="shrink-0 text-sm text-zinc-500">
-                      {exercise.sets} × {exercise.reps}
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    przerwa {exercise.rest_between_sets_s} s
-                    {exercise.note && ` · ${exercise.note}`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <WorkoutSection key={workout.id} workout={workout} patchPlan={patchPlan} />
         ))}
       </div>
+
+      <div className="mt-5">
+        <button
+          onClick={onGenerate}
+          disabled={generating || undone > 0}
+          className="w-full rounded-lg bg-zinc-900 py-2.5 font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+        >
+          {generating ? 'AI układa plan… (może chwilę potrwać)' : 'Generuj następny tydzień'}
+        </button>
+        {undone > 0 && (
+          <p className="mt-1 text-center text-xs text-zinc-500">
+            odhacz wszystkie treningi (zostały {undone})
+          </p>
+        )}
+      </div>
     </div>
+  )
+}
+
+function WorkoutSection({ workout, patchPlan }) {
+  return (
+    <section className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-zinc-900">{workout.name}</h3>
+          {workout.rest_between_exercises_s != null && (
+            <p className="text-xs text-zinc-500">
+              przerwa między ćwiczeniami: {workout.rest_between_exercises_s} s
+            </p>
+          )}
+        </div>
+        {workout.done && workout.completed_date && (
+          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+            zrobiony {workout.completed_date}
+          </span>
+        )}
+      </div>
+
+      <ul className="mt-3 divide-y divide-zinc-100">
+        {workout.exercises.map((exercise) => (
+          <ExerciseFeedback
+            key={exercise.id}
+            workout={workout}
+            exercise={exercise}
+            patchPlan={patchPlan}
+          />
+        ))}
+      </ul>
+
+      <label className="mt-3 flex items-center gap-2 border-t border-zinc-100 pt-3 text-sm text-zinc-700">
+        <input
+          type="checkbox"
+          checked={workout.done}
+          onChange={() =>
+            patchPlan(`/api/plans/active/workouts/${workout.id}`, { done: !workout.done })
+          }
+          className="size-5 accent-emerald-600"
+          aria-label={`Trening zrobiony: ${workout.name}`}
+        />
+        trening zrobiony
+      </label>
+    </section>
+  )
+}
+
+function ExerciseFeedback({ workout, exercise, patchPlan }) {
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteText, setNoteText] = useState(exercise.note || '')
+
+  async function saveNote() {
+    const updated = await patchPlan(
+      `/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`,
+      { note: noteText },
+    )
+    if (updated) setNoteOpen(false)
+  }
+
+  return (
+    <li className="py-2">
+      <div className="flex justify-between gap-2">
+        <span className="text-zinc-900">{exercise.name}</span>
+        <span className="shrink-0 text-sm text-zinc-500">
+          {exercise.sets} × {exercise.reps}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-500">
+        przerwa {exercise.rest_between_sets_s} s
+        {exercise.load && ` · ${exercise.load}`}
+      </p>
+      <div className="mt-1 flex items-center gap-3">
+        <Stars
+          value={exercise.rating}
+          onChange={(n) =>
+            patchPlan(`/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`, {
+              rating: n,
+            })
+          }
+          label={`ocena wykonania: ${exercise.name}`}
+        />
+        <button
+          onClick={() => setNoteOpen(!noteOpen)}
+          className="text-xs text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline"
+        >
+          {exercise.note ? 'zmień uwagę' : '+ uwaga'}
+        </button>
+      </div>
+      {exercise.note && !noteOpen && (
+        <p className="mt-1 text-xs text-zinc-600">„{exercise.note}”</p>
+      )}
+      {noteOpen && (
+        <div className="mt-2 flex gap-2">
+          <input
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="np. boli kolano przy przysiadzie"
+            className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
+          />
+          <button
+            onClick={saveNote}
+            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            Zapisz
+          </button>
+        </div>
+      )}
+    </li>
   )
 }
