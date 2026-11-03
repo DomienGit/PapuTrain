@@ -46,7 +46,7 @@ PLAN.md, potem pisz kod.
 ## Stan projektu
 
 - Repo na GitHub: `DomienGit/PapuTrain` (branch `main`), skonfigurowane remote.
-- Zrobione: PLAN.md (pełna specyfikacja), Etap 0 (szkielet FastAPI), Etap 1 (baza SQLModel, 6 tabel, katalog ćwiczeń JSON, CRUD: profil/sprzęt/katalog), Etap 2 (logowanie JWT + bcrypt, ochrona /api, skrypt `python -m app.create_user`).
-- Następny: Etap 3 (frontend: React+Vite+Tailwind, ekran logowania, token).
+- Zrobione: PLAN.md (pełna specyfikacja), Etap 0 (szkielet FastAPI), Etap 1 (baza SQLModel, 6 tabel, katalog ćwiczeń JSON, CRUD: profil/sprzęt/katalog), Etap 2 (logowanie JWT + bcrypt, ochrona /api, skrypt `python -m app.create_user`), Etap 3 (frontend: React+Vite+Tailwind w `frontend/`, ekran logowania, token w localStorage, proxy `/api` w vite.config.js).
+- Następny: Etap 4 (onboarding i konfiguracja w UI).
 - Uwaga środowiskowa: `.venv` budować na Pythonie 3.12 (na 3.14 sqlmodel 0.0.24 się wysypuje; lokalnie używamy `uv venv --python 3.12`).
 - Otwarte pytanie z planu: domena na VPS (wpływa tylko na Etap 10).
