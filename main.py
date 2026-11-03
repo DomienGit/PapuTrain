@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
 
+import logging
+
 from fastapi import Depends, FastAPI
 
 from app.auth import get_current_user
 from app.database import init_db
 from app.routers import auth, catalog, equipment, plans, profile
+
+# Logi aplikacyjne (np. który model Gemini odpowiedział) idą na stderr razem z logami uvicorn.
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager

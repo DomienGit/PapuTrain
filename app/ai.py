@@ -5,12 +5,19 @@ teksty w UI). Twarde zasady dla AI pochodzą wprost z PLAN.md.
 """
 
 import json
+import logging
+import re
+import time
 
+import httpx
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.config import settings
 from app.models import CatalogExercise, Equipment, Profile
+
+logger = logging.getLogger(__name__)
 
 GYM_NAME = "siłownia"  # rozpoznawana po nazwie (spójnie z frontendem)
 HOME_SUBSTITUTES = "stół, krzesło, ściana, podłoga"
@@ -18,6 +25,15 @@ HOME_SUBSTITUTES = "stół, krzesło, ściana, podłoga"
 
 class AiError(Exception):
     """Błąd generowania planu — komunikat gotowy do wyświetlenia w UI."""
+
+
+def _status_code(err: Exception) -> int | None:
+    """Wyciąga kod HTTP z wyjątku SDK (atrybut .code albo z tekstu błędu)."""
+    code = getattr(err, "code", None)
+    if isinstance(code, int):
+        return code
+    match = re.search(r"\b([45]\d\d)\b", str(err))
+    return int(match.group(1)) if match else None
 
 
 def _has_gym(equipment: list[Equipment]) -> bool:
@@ -130,32 +146,60 @@ def build_generation_prompt(
 
 
 def generate_plan(prompt: str) -> dict:
-    """Wysyła prompt do Gemini i zwraca sparsowany JSON. Rzuca AiError, gdy coś pójdzie nie tak."""
+    """Wysyła prompt do Gemini i zwraca sparsowany JSON.
+
+    Darmowy limit (free tier) jest dzienny PER MODEL, więc przy odmowie
+    (limit 429, przeciążenie 5xx, nieosiągalny 404, timeout) próbujemy
+    kolejny model z listy GEMINI_MODELS.
+    """
     if not settings.gemini_api_key:
         raise AiError("Brak klucza GEMINI_API_KEY w pliku .env — dodaj go i zrestartuj serwer")
 
     # UWAGA: timeout w google-genai jest w MILISEKUNDACH (90000 = 90 s).
-    # Bez jawnego timeoutu zapytanie potrafi wisieć bardzo długo.
     client = genai.Client(
         api_key=settings.gemini_api_key,
         http_options=types.HttpOptions(timeout=90000),
     )
-    try:
-        response = client.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",  # wymuszony tryb JSON
-                temperature=0.7,
-            ),
-        )
-    except Exception as err:
-        raise AiError(f"Nie udało się połączyć z Gemini: {err}") from err
 
-    text = (response.text or "").strip()
-    if not text:
-        raise AiError("Gemini zwrócił pustą odpowiedź — spróbuj ponownie")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as err:
-        raise AiError("Gemini zwrócił odpowiedź, która nie jest poprawnym JSON-em") from err
+    problems: list[str] = []
+    for model in settings.gemini_models_list:
+        start = time.monotonic()
+        try:
+            logger.info("Gemini: pytam model %s", model)
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",  # wymuszony tryb JSON
+                    temperature=0.7,
+                ),
+            )
+        except (genai_errors.ClientError, genai_errors.ServerError) as err:
+            code = _status_code(err)
+            if code == 429 or code == 404 or (code is not None and 500 <= code < 600):
+                logger.warning("Gemini: %s odmówił (HTTP %s) — następny model", model, code)
+                problems.append(f"{model} (HTTP {code})")
+                continue
+            # 401/403 (zły klucz) czy 400 (złe zapytanie) — zmiana modelu nie pomoże
+            raise AiError(f"Gemini odrzucił zapytanie (HTTP {code}): {err}") from err
+        except httpx.HTTPError as err:
+            # np. timeout — model przyjęty, ale nie odpowiada (widzieliśmy to na 3.8-flash)
+            logger.warning("Gemini: %s nie odpowiedział (%s) — następny model", model, type(err).__name__)
+            problems.append(f"{model} (brak odpowiedzi)")
+            continue
+
+        elapsed = time.monotonic() - start
+        text = (response.text or "").strip()
+        if not text:
+            raise AiError("Gemini zwrócił pustą odpowiedź — spróbuj ponownie")
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError as err:
+            raise AiError("Gemini zwrócił odpowiedź, która nie jest poprawnym JSON-em") from err
+        logger.info("Gemini: model %s odpowiedział w %.1f s", model, elapsed)
+        return result
+
+    raise AiError(
+        "Wszystkie modele wyczerpały limit albo nie odpowiadają (" + "; ".join(problems) + "). "
+        "Spróbuj ponownie później."
+    )

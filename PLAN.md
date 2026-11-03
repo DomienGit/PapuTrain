@@ -141,5 +141,7 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 
 - JavaScript bez TypeScript na start (mniej nauki naraz; TS można dodać później).
 - SQLModel zamiast czystego SQLAlchemy (prostszy zapis, spójny z FastAPI).
-- Model Gemini: najnowszy Flash (darmowy limit wystarcza — generowanie planu to 1 zapytanie, ewentualnie kilka poprawek).
+- Model Gemini: łańcuch fallbacku (limit darmowy jest dzienny per model — po wyczerpaniu
+  backend sam przechodzi na kolejny): gemini-3.6-flash → gemini-3-flash-preview →
+  gemini-3.5-flash-lite → gemini-3.1-flash-lite. Lista konfigurowalna w .env (GEMINI_MODELS).
 - Na VPS: aplikacja pod własną subdomeną/domeną z HTTPS; bez domeny — dostęp po IP + port, ale wtedy certyfikat jest trudniejszy.
