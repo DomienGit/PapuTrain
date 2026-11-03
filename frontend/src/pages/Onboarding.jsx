@@ -23,7 +23,7 @@ export default function Onboarding({ onDone }) {
   useEffect(() => {
     if (step !== 2) return
     api('/api/equipment?owned=true')
-      .then((items) => setOwnedNames(new Set(items.map((i) => i.name.casefold()))))
+      .then((items) => setOwnedNames(new Set(items.map((i) => i.name.toLowerCase()))))
       .catch((err) => setError(err.message))
   }, [step])
 

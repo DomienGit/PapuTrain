@@ -204,7 +204,7 @@ export default function EquipmentList({ allowAdd = false }) {
 
       <ul className="divide-y divide-zinc-100 rounded-xl bg-white shadow-sm">
         {sorted.map((item) => {
-          const key = item.name.casefold()
+          const key = item.name.toLowerCase()
           const isGym = key === SILNIA
           return (
             <li key={item.id}>

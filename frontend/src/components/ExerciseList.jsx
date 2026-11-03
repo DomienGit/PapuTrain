@@ -28,7 +28,7 @@ export default function ExerciseList({ ownedNames, allowAdd = false }) {
 
   function isFeasible(exercise) {
     if (ownedNames.has('siłownia')) return true // tryb siłowni = pełny dostęp
-    return exercise.required_equipment.every((eq) => ownedNames.has(eq.casefold()))
+    return exercise.required_equipment.every((eq) => ownedNames.has(eq.toLowerCase()))
   }
 
   async function toggleChosen(item) {

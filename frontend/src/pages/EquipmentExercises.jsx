@@ -16,7 +16,7 @@ export default function EquipmentExercises() {
   useEffect(() => {
     if (subTab !== 'exercises') return
     api('/api/equipment?owned=true')
-      .then((items) => setOwnedNames(new Set(items.map((i) => i.name.casefold()))))
+      .then((items) => setOwnedNames(new Set(items.map((i) => i.name.toLowerCase()))))
       .catch(() => {})
   }, [subTab])
 
