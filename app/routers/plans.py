@@ -9,10 +9,15 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
 from sqlmodel import select
 
-from app.ai import AiError, build_generation_prompt, generate_plan
+from app.ai import (
+    AiError,
+    build_generation_prompt,
+    build_workout_revision_prompt,
+    generate_plan,
+)
 from app.database import SessionDep
 from app.models import CatalogExercise, Equipment, Exercise, Plan, Profile, Workout
-from app.schemas import AiPlan
+from app.schemas import AiPlan, AiWorkout, AskAiRequest, ExerciseUpdate, WorkoutUpdate
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 
@@ -70,10 +75,10 @@ def _delete_plan(session, plan: Plan) -> None:
     session.delete(plan)
 
 
-def _register_ai_exercises(session, plan_data: AiPlan) -> None:
+def _register_ai_exercises(session, workouts: list[AiWorkout]) -> None:
     """Nowe nazwy ćwiczeń od AI dopisuje do katalogu ze źródłem "ai" (PLAN.md)."""
     existing = {ex.name.casefold() for ex in session.exec(select(CatalogExercise)).all()}
-    for workout in plan_data.workouts:
+    for workout in workouts:
         for exercise in workout.exercises:
             if exercise.name.casefold() not in existing:
                 session.add(
@@ -152,7 +157,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
                 )
             )
 
-    _register_ai_exercises(session, plan_data)
+    _register_ai_exercises(session, plan_data.workouts)
     session.commit()
     return _plan_to_dict(session, plan)
 
@@ -171,3 +176,151 @@ def get_active(session: SessionDep) -> dict:
     if active is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak aktywnego planu")
     return _plan_to_dict(session, active)
+
+
+# --- Etap 6: panel szkicu (zatwierdzanie, edycja ręczna, prośba do AI) ---
+
+# Edycja szkicu pozwala uporządkować plan PRZED zatwierdzeniem; aktywny plan
+# dostaje własne akcje (odhaczanie, oceny) w Etapie 7.
+def _get_draft_or_404(session) -> Plan:
+    draft = session.exec(select(Plan).where(Plan.status == "draft")).first()  # type: ignore[arg-type]
+    if draft is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak szkicu planu")
+    return draft
+
+
+def _get_draft_workout_or_404(session, workout_id: int) -> Workout:
+    """Trening szkicu o podanym id (404, gdy nie istnieje lub należy do innego planu)."""
+    workout = session.get(Workout, workout_id)
+    if workout is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego treningu w szkicu")
+    if workout.plan_id != _get_draft_or_404(session).id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten trening nie należy do szkicu")
+    return workout
+
+
+def _workout_exercises(session, workout: Workout) -> list[Exercise]:
+    return list(
+        session.exec(select(Exercise).where(Exercise.workout_id == workout.id)).all()  # type: ignore[arg-type]
+    )
+
+
+@router.post("/draft/approve")
+def approve_draft(session: SessionDep) -> dict:
+    """Szkic staje się planem aktywnym; dotychczasowy aktywny przechodzi do archiwum."""
+    draft = _get_draft_or_404(session)
+    old_active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
+    if old_active is not None:
+        old_active.status = "archived"
+        session.add(old_active)
+    draft.status = "active"
+    session.add(draft)
+    session.commit()
+    session.refresh(draft)
+    return _plan_to_dict(session, draft)
+
+
+@router.delete("/draft")
+def reject_draft(session: SessionDep) -> dict:
+    """Odrzucenie szkicu — użytkownik może od razu wygenerować plan od nowa."""
+    draft = _get_draft_or_404(session)
+    _delete_plan(session, draft)
+    session.commit()
+    return {"deleted": True}
+
+
+@router.patch("/draft/workouts/{workout_id}")
+def update_workout(workout_id: int, data: WorkoutUpdate, session: SessionDep) -> dict:
+    """Ręczna zmiana treningu w szkicu: nazwa, przerwa między ćwiczeniami."""
+    workout = _get_draft_workout_or_404(session, workout_id)
+    if data.name is not None:
+        workout.name = data.name
+    if data.rest_between_exercises_s is not None:
+        workout.rest_between_exercises_s = data.rest_between_exercises_s
+    session.add(workout)
+    session.commit()
+    return _plan_to_dict(session, session.get(Plan, workout.plan_id))
+
+
+@router.patch("/draft/workouts/{workout_id}/exercises/{exercise_id}")
+def update_exercise(
+    workout_id: int, exercise_id: int, data: ExerciseUpdate, session: SessionDep
+) -> dict:
+    """Ręczna zmiana ćwiczenia w szkicu: nazwa, serie, powtórzenia, przerwy, uwagi."""
+    workout = _get_draft_workout_or_404(session, workout_id)  # pilnuje, że to trening szkicu
+    exercise = session.get(Exercise, exercise_id)
+    if exercise is None or exercise.workout_id != workout_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
+    for field in ("name", "sets", "reps", "rest_between_sets_s", "load", "note"):
+        value = getattr(data, field)
+        if value is not None:
+            setattr(exercise, field, value)
+    session.add(exercise)
+    session.commit()
+    return _plan_to_dict(session, session.get(Plan, workout.plan_id))
+
+
+@router.delete("/draft/workouts/{workout_id}/exercises/{exercise_id}")
+def delete_exercise(workout_id: int, exercise_id: int, session: SessionDep) -> dict:
+    """Usunięcie ćwiczenia ze szkicu."""
+    workout = _get_draft_workout_or_404(session, workout_id)
+    exercise = session.get(Exercise, exercise_id)
+    if exercise is None or exercise.workout_id != workout_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
+    session.delete(exercise)
+    session.commit()
+    return _plan_to_dict(session, session.get(Plan, workout.plan_id))
+
+
+@router.post("/draft/workouts/{workout_id}/ask-ai")
+def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: SessionDep) -> dict:
+    """"Poproś AI o zmianę": AI przepisuje jeden trening wg tekstowej prośby."""
+    workout = _get_draft_workout_or_404(session, workout_id)
+    draft = session.get(Plan, workout.plan_id)
+
+    profile = session.exec(select(Profile)).first()
+    if profile is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Najpierw uzupełnij profil w kreatorze")
+    equipment = list(session.exec(select(Equipment).where(Equipment.owned)).all())  # type: ignore[arg-type]
+    catalog = list(session.exec(select(CatalogExercise)).all())
+
+    all_workouts = session.exec(
+        select(Workout).where(Workout.plan_id == draft.id).order_by(Workout.number)  # type: ignore[arg-type]
+    ).all()
+    workouts_with_exercises = [(w, _workout_exercises(session, w)) for w in all_workouts]
+
+    prompt = build_workout_revision_prompt(
+        profile, equipment, catalog, workouts_with_exercises, workout, body.request
+    )
+    try:
+        raw = generate_plan(prompt)
+        workout_data = AiWorkout.model_validate(raw)
+    except AiError as err:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(err))
+    except ValidationError as err:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"AI zwróciło trening o niepoprawnej strukturze: {err.errors()[:3]}",
+        )
+
+    # Stare ćwiczenia treningu lecą do kosza, wchodzą nowe od AI.
+    for exercise in _workout_exercises(session, workout):
+        session.delete(exercise)
+    workout.name = workout_data.workout_name
+    workout.rest_between_exercises_s = workout_data.rest_between_exercises
+    session.add(workout)
+    session.flush()
+    for exercise_data in workout_data.exercises:
+        session.add(
+            Exercise(
+                workout_id=workout.id,
+                name=exercise_data.name,
+                sets=exercise_data.sets,
+                reps=exercise_data.reps,
+                rest_between_sets_s=exercise_data.rest_between_sets,
+                note=exercise_data.notes,
+            )
+        )
+    _register_ai_exercises(session, [workout_data])
+    session.commit()
+    return _plan_to_dict(session, draft)

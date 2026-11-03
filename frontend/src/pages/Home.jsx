@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import DraftPanel from '../components/DraftPanel'
 
 /**
- * Ekran główny. Etap 5: pokazuje aktywny plan albo szkic wygenerowany przez AI
- * (z przyciskiem "Generuj plan"). Panel zatwierdzania i edycji szkicu — Etap 6.
+ * Ekran główny. Pokazuje aktywny plan, szkic (panel edycji/zatwierdzania
+ * z Etapu 6) albo przycisk "Generuj plan", gdy planu nie ma wcale.
  */
 export default function Home({ username }) {
   const [plan, setPlan] = useState(null) // null = brak planu; {status, workouts...}
@@ -47,7 +48,11 @@ export default function Home({ username }) {
       )}
 
       {plan ? (
-        <PlanView plan={plan} />
+        plan.status === 'draft' ? (
+          <DraftPanel plan={plan} onChange={setPlan} onRejected={() => setPlan(null)} />
+        ) : (
+          <PlanView plan={plan} />
+        )
       ) : loaded ? (
         <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-sm">
           <p className="text-sm text-zinc-500">
@@ -69,19 +74,11 @@ export default function Home({ username }) {
 }
 
 function PlanView({ plan }) {
-  const isDraft = plan.status === 'draft'
   return (
     <div className="mt-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-zinc-900">
-          {plan.week_title || `Tydzień ${plan.week_number}`}
-        </h2>
-        {isDraft && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-            szkic
-          </span>
-        )}
-      </div>
+      <h2 className="text-lg font-bold text-zinc-900">
+        {plan.week_title || `Tydzień ${plan.week_number}`}
+      </h2>
 
       {plan.coach_note && (
         <p className="mt-2 rounded-xl bg-white p-3 text-sm text-zinc-600 shadow-sm">
@@ -120,12 +117,6 @@ function PlanView({ plan }) {
           </section>
         ))}
       </div>
-
-      {isDraft && (
-        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-          To szkic. Zatwierdzanie i ręczna edycja pojawią się w kolejnym etapie.
-        </p>
-      )}
     </div>
   )
 }

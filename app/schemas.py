@@ -66,6 +66,30 @@ class AiPlan(SQLModel):
     coach_note: str = Field(default="", max_length=1000)
 
 
+class WorkoutUpdate(SQLModel):
+    """Ręczna edycja treningu w szkicu (Etap 6). Pola None = bez zmian."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    rest_between_exercises_s: int | None = Field(default=None, ge=0, le=600)
+
+
+class ExerciseUpdate(SQLModel):
+    """Ręczna edycja ćwiczenia w szkicu (Etap 6). Pola None = bez zmian."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    sets: int | None = Field(default=None, ge=1, le=20)
+    reps: str | None = Field(default=None, min_length=1, max_length=100)
+    rest_between_sets_s: int | None = Field(default=None, ge=0, le=600)
+    load: str | None = Field(default=None, max_length=200)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AskAiRequest(SQLModel):
+    """Tekst prośby do AI: "poproś AI o zmianę" dla jednego treningu."""
+
+    request: str = Field(min_length=1, max_length=1000)
+
+
 class LoginRequest(SQLModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)

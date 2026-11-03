@@ -15,7 +15,7 @@ from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.config import settings
-from app.models import CatalogExercise, Equipment, Profile
+from app.models import CatalogExercise, Equipment, Exercise, Profile, Workout
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +145,98 @@ def build_generation_prompt(
     }
   ],
   "coach_note": "Krótka uwaga trenera na ten tydzień"
+}""",
+        ]
+    )
+    return "\n".join(body)
+
+
+def build_workout_revision_prompt(
+    profile: Profile,
+    equipment: list[Equipment],
+    catalog: list[CatalogExercise],
+    workouts_with_exercises: list[tuple[Workout, list[Exercise]]],
+    target: Workout,
+    user_request: str,
+) -> str:
+    """Prompt "poproś AI o zmianę": AI przepisuje JEDEN trening, reszta planu zostaje."""
+    gym = _has_gym(equipment)
+    body = [
+        "Jesteś doświadczonym trenerem personalnym. Zmieniasz JEDEN trening w tygodniowym "
+        "planie zgodnie z prośbą podopiecznego.",
+        "",
+        "PROFIL OSOBY:",
+        f"- cel: {profile.goal}",
+        f"- poziom zaawansowania: {profile.level}",
+        f"- liczba treningów w tygodniu: {profile.workouts_per_week}",
+        f"- maksymalny czas jednego treningu: {profile.workout_duration_min} minut",
+    ]
+    if profile.limitations:
+        body.append(f"- ograniczenia zdrowotne: {profile.limitations}")
+
+    body.append("")
+    body.append("DOSTĘPNY SPRZĘT:")
+    eq_lines = _equipment_lines(equipment)
+    if gym:
+        body.append("- PEŁNY DOSTĘP DO SIŁOWNI (wszystkie maszyny, sztangi, półki itd.)")
+    if eq_lines:
+        body.extend(eq_lines)
+    if not eq_lines and not gym:
+        body.append("- brak — tylko masa własnego ciała")
+    body.append(f"- zawsze dozwolone: masa własnego ciała i domowe zamienniki ({HOME_SUBSTITUTES})")
+
+    body.append("")
+    body.append("AKTUALNY PLAN TYGODNIA (kontekst — NIE zmieniaj innych treningów, "
+                "dbaj o różnorodność między nimi):")
+    for workout, exercises in workouts_with_exercises:
+        if workout.id == target.id:
+            continue
+        names = ", ".join(f"{ex.name} ({ex.sets} × {ex.reps})" for ex in exercises)
+        body.append(f"- {workout.name}: {names}")
+
+    target_exercises = next(
+        exercises for workout, exercises in workouts_with_exercises if workout.id == target.id
+    )
+    body.append("")
+    body.append("TRENING DO ZMIANY:")
+    body.append(f"- nazwa: {target.name}")
+    if target.rest_between_exercises_s is not None:
+        body.append(f"- przerwa między ćwiczeniami: {target.rest_between_exercises_s} s")
+    body.append("- obecne ćwiczenia:")
+    for ex in target_exercises:
+        line = f"  - {ex.name} ({ex.sets} × {ex.reps}, przerwa {ex.rest_between_sets_s} s"
+        if ex.note:
+            line += f", uwaga: {ex.note}"
+        body.append(line + ")")
+
+    body.append("")
+    body.append("PROŚBA PODOPIECZNEGO:")
+    body.append(user_request)
+
+    body.extend(
+        [
+            "",
+            "TWARDE ZASADY:",
+            "1. Zwróć DOKŁADNIE JEDEN trening (ten zmieniany) w strukturze JSON poniżej.",
+            "2. Używaj WYŁĄCZNIE ćwiczeń wykonalnych bez sprzętu, z domowymi zamiennikami "
+            "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
+            "pełnego dostępu do siłowni.",
+            "3. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach).",
+            "4. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
+            "podopieczny. Nie musisz wymieniać wszystkiego.",
+            "5. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+            "6. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
+            "7. Wszystkie teksty po polsku.",
+            "",
+            "ODPOWIEDŹ: zwróć WYŁĄCZNIE poprawny JSON (bez komentarzy i markdown) "
+            "dokładnie w tej strukturze:",
+            """{
+  "workout_name": "Trening 1 — góra ciała",
+  "rest_between_exercises": 60,
+  "exercises": [
+    {"name": "Pompki", "sets": 4, "reps": "8-12", "rest_between_sets": 90,
+     "notes": "tempo wolne na zejściu"}
+  ]
 }""",
         ]
     )
