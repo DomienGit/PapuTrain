@@ -20,11 +20,13 @@ class ProfileUpsert(SQLModel):
 class EquipmentCreate(SQLModel):
     name: str = Field(min_length=1, max_length=100)
     owned: bool = True  # domyślnie: dodaję, bo mam
+    details: str = Field(default="", max_length=500)
 
 
 class EquipmentUpdate(SQLModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     owned: bool | None = None
+    details: str | None = Field(default=None, max_length=500)
 
 
 class CatalogExerciseCreate(SQLModel):

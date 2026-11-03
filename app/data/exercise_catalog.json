@@ -1,13 +1,19 @@
 {
   "equipment": [
     "hantle",
+    "sztanga",
+    "Obciążenie",
     "gumy oporowe",
     "drążek",
     "ławka płaska",
     "mata",
     "kettlebell",
     "piłka gimnastyczna",
-    "step"
+    "step",
+    "skakanka",
+    "TRX",
+    "bondy",
+    "Siłownia"
   ],
   "exercises": [
     { "name": "Pompki klasyczne", "equipment": [] },

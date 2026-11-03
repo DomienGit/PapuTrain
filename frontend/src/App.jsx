@@ -1,121 +1,44 @@
 import { useEffect, useState } from 'react'
-import { api, clearToken, getToken, setToken } from './api'
+import { api, clearToken, getToken } from './api'
+import EquipmentExercises from './pages/EquipmentExercises'
+import Home from './pages/Home'
+import Login from './pages/Login'
+import Onboarding from './pages/Onboarding'
 
-const inputClass =
-  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base ' +
-  'outline-none focus:border-zinc-900'
-
-function LoginScreen({ onLoggedIn }) {
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function handleSubmit(event) {
-    event.preventDefault() // formularz ma nie przeładowywać strony
-    setBusy(true)
-    setError('')
-    const form = new FormData(event.target)
-    try {
-      const data = await api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: form.get('username'),
-          password: form.get('password'),
-        }),
-      })
-      setToken(data.access_token)
-      const me = await api('/api/auth/me') // potwierdzenie, że token działa
-      onLoggedIn(me.username)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-zinc-100 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm"
-      >
-        <h1 className="mb-1 text-2xl font-bold text-zinc-900">PapuTrain</h1>
-        <p className="mb-6 text-sm text-zinc-500">Zaloguj się, żeby grzebać w planach</p>
-
-        <label className="mb-1 block text-sm font-medium text-zinc-700" htmlFor="username">
-          Login
-        </label>
-        <input
-          id="username"
-          name="username"
-          autoComplete="username"
-          required
-          className={inputClass}
-        />
-
-        <label className="mt-4 mb-1 block text-sm font-medium text-zinc-700" htmlFor="password">
-          Hasło
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className={inputClass}
-        />
-
-        {error && (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-6 w-full rounded-lg bg-zinc-900 py-2.5 text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
-        >
-          {busy ? 'Loguję…' : 'Zaloguj się'}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-function HomeScreen({ username, onLogout }) {
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-zinc-100 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-sm">
-        <h1 className="text-2xl font-bold text-zinc-900">PapuTrain</h1>
-        <p className="mt-2 text-zinc-600">
-          Cześć, <span className="font-semibold">{username}</span>!
-        </p>
-        <p className="mt-4 text-sm text-zinc-500">
-          Tu stanie główny ekran aplikacji — onboarding i plany (kolejne etapy).
-        </p>
-        <button
-          onClick={onLogout}
-          className="mt-6 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
-        >
-          Wyloguj się
-        </button>
-      </div>
-    </div>
-  )
-}
-
+/**
+ * Rdzeń aplikacji: pilnuje sesji (token) i przełącza ekrany.
+ * Router jest niepotrzebny — kilka widoków obsłużymy stanem (tab).
+ */
 export default function App() {
   const [username, setUsername] = useState(null)
   const [checking, setChecking] = useState(Boolean(getToken()))
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [tab, setTab] = useState('home') // 'home' | 'equipment'
 
-  // Po wczytaniu strony: mamy zapisany token? Zapytaj API, czy nadal ważny.
+  // Sprawdzenie profilu decyduje o pokazaniu kreatora pierwszego uruchomienia.
+  function checkProfile() {
+    return api('/api/profile').then((profile) => setNeedsOnboarding(profile === null))
+  }
+
+  // Po wejściu na stronę: sprawdzamy token (o ile jest), a potem profil.
+  // Brak profilu => kreator pierwszego uruchomienia (PLAN.md: onboarding).
   useEffect(() => {
     if (!getToken()) return
     api('/api/auth/me')
-      .then((data) => setUsername(data.username))
+      .then((me) => {
+        setUsername(me.username)
+        return checkProfile()
+      })
       .catch(() => {}) // api() sam wyczyścił nieaktualny token
       .finally(() => setChecking(false))
   }, [])
+
+  function handleLogout() {
+    clearToken()
+    setUsername(null)
+    setNeedsOnboarding(false)
+    setTab('home')
+  }
 
   if (checking) {
     return (
@@ -125,9 +48,42 @@ export default function App() {
     )
   }
 
-  return username ? (
-    <HomeScreen username={username} onLogout={() => { clearToken(); setUsername(null) }} />
-  ) : (
-    <LoginScreen onLoggedIn={setUsername} />
+  if (!username)
+    return (
+      <Login
+        onLoggedIn={(name) => {
+          setUsername(name)
+          checkProfile().catch(() => {})
+        }}
+      />
+    )
+  if (needsOnboarding) return <Onboarding onDone={() => setNeedsOnboarding(false)} />
+
+  return (
+    <div className="min-h-dvh bg-zinc-100 pb-20">
+      {tab === 'home' ? <Home username={username} /> : <EquipmentExercises />}
+
+      <nav className="fixed inset-x-0 bottom-0 flex border-t border-zinc-200 bg-white">
+        <NavItem active={tab === 'home'} label="Główny" onClick={() => setTab('home')} />
+        <NavItem
+          active={tab === 'equipment'}
+          label="Sprzęt i ćwiczenia"
+          onClick={() => setTab('equipment')}
+        />
+      </nav>
+    </div>
+  )
+}
+
+function NavItem({ active, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+        active ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
+      }`}
+    >
+      {label}
+    </button>
   )
 }

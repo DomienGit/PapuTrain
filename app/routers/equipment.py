@@ -42,6 +42,7 @@ def create_equipment(data: EquipmentCreate, session: SessionDep) -> Equipment:
         name=name,
         type="predefined" if name.casefold() in predefined_equipment_names() else "custom",
         owned=data.owned,
+        details=data.details,
     )
     session.add(equipment)
     session.commit()

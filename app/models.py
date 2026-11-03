@@ -44,6 +44,7 @@ class Equipment(SQLModel, table=True):
     name: str = Field(index=True, unique=True)
     type: str = "custom"
     owned: bool = False  # czy_posiadany
+    details: str = ""  # np. "4×2,5 kg + 2×10 kg" (krążki dla "Obciążenie")
 
 
 class CatalogExercise(SQLModel, table=True):

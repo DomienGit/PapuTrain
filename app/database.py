@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import func
+from sqlalchemy import func, text
+from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import models  # noqa: F401 — import rejestruje tabele w SQLModel
@@ -39,10 +40,26 @@ def predefined_equipment_names() -> set[str]:
 
 
 def init_db() -> None:
-    """Tworzy tabele (jeśli brak) i wypełnia katalog przy pierwszym uruchomieniu."""
+    """Tworzy tabele (jeśli brak), dodaje nowe kolumny i zasila katalog."""
     SQLModel.metadata.create_all(engine)
+    _migrate()
     _seed_equipment()
     _seed_catalog()
+
+
+def _migrate() -> None:
+    """Drobne zmiany schematu dla istniejącej bazy (create_all nie dodaje kolumn).
+
+    SQLite wymaga ALTER TABLE; jeśli kolumna już istnieje, po prostu ignorujemy błąd.
+    """
+    try:
+        with Session(engine) as session:
+            session.execute(
+                text("ALTER TABLE equipment ADD COLUMN details TEXT NOT NULL DEFAULT ''")
+            )
+            session.commit()
+    except OperationalError:
+        pass  # kolumna już jest — nic do zrobienia
 
 
 def _seed_equipment() -> None:
