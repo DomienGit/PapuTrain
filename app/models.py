@@ -10,6 +10,16 @@ from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 
+class User(SQLModel, table=True):
+    """Jedno konto logowania — aplikacja jest jednoosobowa."""
+
+    __tablename__ = "users"
+
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True)
+    password_hash: str  # hash bcrypt — czystego hasła NIGDY nie zapisujemy
+
+
 class Profile(SQLModel, table=True):
     """Jeden rekord — profil treningowy Dominika."""
 

@@ -38,3 +38,13 @@ class CatalogExerciseUpdate(SQLModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     chosen: bool | None = None
     preference_rating: int | None = Field(default=None, ge=1, le=5)
+
+
+class LoginRequest(SQLModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class TokenResponse(SQLModel):
+    access_token: str
+    token_type: str = "bearer"
