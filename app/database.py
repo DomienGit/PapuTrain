@@ -48,15 +48,17 @@ def init_db() -> None:
 
 
 def _migrate() -> None:
-    """Drobne zmiany schematu dla istniejącej bazy (create_all nie dodaje kolumn).
+    """Drobne zmiany schematu dla istniejącej bazy (create_all nie dodaje kolumn)."""
+    _add_column("equipment", "details", "TEXT NOT NULL DEFAULT ''")
+    _add_column("plans", "week_title", "TEXT NOT NULL DEFAULT ''")
+    _add_column("plans", "coach_note", "TEXT NOT NULL DEFAULT ''")
 
-    SQLite wymaga ALTER TABLE; jeśli kolumna już istnieje, po prostu ignorujemy błąd.
-    """
+
+def _add_column(table: str, column: str, definition: str) -> None:
+    """ALTER TABLE dla SQLite; ignoruje błąd, gdy kolumna już istnieje."""
     try:
         with Session(engine) as session:
-            session.execute(
-                text("ALTER TABLE equipment ADD COLUMN details TEXT NOT NULL DEFAULT ''")
-            )
+            session.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
             session.commit()
     except OperationalError:
         pass  # kolumna już jest — nic do zrobienia

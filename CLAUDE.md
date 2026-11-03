@@ -46,7 +46,7 @@ PLAN.md, potem pisz kod.
 ## Stan projektu
 
 - Repo na GitHub: `DomienGit/PapuTrain` (branch `main`), skonfigurowane remote.
-- Zrobione: PLAN.md (pełna specyfikacja), Etap 0 (szkielet FastAPI), Etap 1 (baza SQLModel, 6 tabel, katalog ćwiczeń JSON, CRUD: profil/sprzęt/katalog), Etap 2 (logowanie JWT + bcrypt, ochrona /api, skrypt `python -m app.create_user`), Etap 3 (frontend: React+Vite+Tailwind w `frontend/`, ekran logowania, token w localStorage, proxy `/api` w vite.config.js), Etap 4 (onboarding 3 kroki, zakładka "Sprzęt i ćwiczenia", panel "Obciążenie" z krążkami, flaga "Siłownia"; przetestowane na poziomie API i builda — kliki Dominika do potwierdzenia).
-- Następny: Etap 5 (integracja Gemini).
+- Zrobione: PLAN.md (pełna specyfikacja), Etap 0 (szkielet FastAPI), Etap 1 (baza SQLModel, 6 tabel, katalog ćwiczeń JSON, CRUD: profil/sprzęt/katalog), Etap 2 (logowanie JWT + bcrypt, ochrona /api, skrypt `python -m app.create_user`), Etap 3 (frontend: React+Vite+Tailwind w `frontend/`, ekran logowania, token w localStorage, proxy `/api` w vite.config.js), Etap 4 (onboarding 3 kroki, zakładka "Sprzęt i ćwiczenia", panel "Obciążenie" z krążkami, flaga "Siłownia"; przetestowane na poziomie API i builda — kliki Dominika do potwierdzenia), Etap 5 (Gemini generuje draft planu: prompt z profilu/sprzętu/katalogu, walidacja JSON, zapis do bazy, endpointy generate/draft/active; model domyślny `gemini-3.1-flash-lite`, klucz w .env; przetestowane NA ŻYWO — plan wygenerowany w ~3,5 s).
+- Następny: Etap 6 (panel draftu: podgląd, edycja ręczna, "poproś AI o zmianę", zatwierdzanie).
 - Uwaga środowiskowa: `.venv` budować na Pythonie 3.12 (na 3.14 sqlmodel 0.0.24 się wysypuje; lokalnie używamy `uv venv --python 3.12`).
 - Otwarte pytanie z planu: domena na VPS (wpływa tylko na Etap 10).

@@ -64,7 +64,7 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
   (opcjonalny tekst, np. "4×2,5 kg + 2×10 kg" dla pozycji "Obciążenie"). Pozycja
   "Siłownia" rozpoznawana po nazwie: jej posiadanie = pełny dostęp do sprzętu.
 - **exercise_catalog** — nazwa_ćwiczenia, potrzebny_sprzęt (lista nazw sprzętu), czy_wybrane (zaznaczone przeze mnie jako "pasuje"), moja_ocena (1-5, null = nieocenione), źródło (wbudowane / AI / własne). Wbudowany katalog (ok. 80-100 ćwiczeń z przypisanym sprzętem) generuje raz Gemini na etapie budowy aplikacji i trafia do pliku JSON w kodzie. Ćwiczenia zasugerowane przez AI w planach ZAPISUJĄ SIĘ AUTOMATYCZNIE do katalogu (źródło: AI) — katalog rośnie z każdym tygodniem i jest wysyłany do AI przy kolejnych generowaniach, żeby AI nie wymyślał nazw od zera (mniejszy koszt zapytań, spójna nazwa ćwiczenia).
-- **plans** — id, data_startu_tygdnia, status (draft / active / archived), numer_tygodnia, uwagi_od_użytkownika.
+- **plans** — id, data_startu_tygdnia, status (draft / active / archived), numer_tygodnia, tytuł_tygodnia i notatka_trenera (z odpowiedzi AI), uwagi_od_użytkownika.
 - **workouts** (treningi w planie) — id, plan_id, numer_treningu (1, 2, 3...), nazwa_treningu (np. "Trening A — góra ciała"), przerwa_miedzy_cwiczeniami_s (sekundy, opcjonalna), czy_zrobiony (bool), data_wykonania (opcjonalna). Brak pola "dzień tygodnia" — trening wykonywany w dowolnym dniu.
 - **exercises** — id, workout_id, nazwa, serie, powtórzenia, przerwa_miedzy_seriami_s (sekundy), obciążenie/opis, ocena (1-5, null = brak — to ocena WYKONANIA w danym tygodniu, nie mylić z oceną preferencji w exercise_catalog), uwaga (tekst).
 

@@ -73,6 +73,8 @@ class Plan(SQLModel, table=True):
     week_start_date: date | None = None
     status: str = Field(default="draft")
     week_number: int = 1
+    week_title: str = ""  # tytuł z odpowiedzi AI, np. "Tydzień 3"
+    coach_note: str = ""  # notatka trenera z odpowiedzi AI
     user_notes: str = ""
 
 

@@ -42,6 +42,30 @@ class CatalogExerciseUpdate(SQLModel):
     preference_rating: int | None = Field(default=None, ge=1, le=5)
 
 
+class AiExercise(SQLModel):
+    """Ćwiczenie w odpowiedzi AI — walidacja zanim dane trafią do bazy."""
+
+    name: str = Field(min_length=1, max_length=150)
+    sets: int = Field(ge=1, le=20)
+    reps: str = Field(min_length=1, max_length=100)
+    rest_between_sets: int = Field(ge=0, le=600)  # sekundy
+    notes: str = Field(default="", max_length=500)
+
+
+class AiWorkout(SQLModel):
+    workout_name: str = Field(min_length=1, max_length=150)
+    rest_between_exercises: int = Field(ge=0, le=600)  # sekundy
+    exercises: list[AiExercise] = Field(min_length=1, max_length=20)
+
+
+class AiPlan(SQLModel):
+    """Cała odpowiedź AI: tytuł tygodnia, treningi i notatka trenera."""
+
+    week_title: str = Field(min_length=1, max_length=100)
+    workouts: list[AiWorkout] = Field(min_length=1, max_length=7)
+    coach_note: str = Field(default="", max_length=1000)
+
+
 class LoginRequest(SQLModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)

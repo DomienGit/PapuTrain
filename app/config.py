@@ -11,6 +11,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     jwt_secret: str
     token_expire_days: int = 30  # po tylu dniach token wygasa (trzeba się zalogować)
+    gemini_api_key: str = ""  # pusty = generowanie planów wyłączone (jasny błąd w API)
+    gemini_model: str = "gemini-3.1-flash-lite"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
