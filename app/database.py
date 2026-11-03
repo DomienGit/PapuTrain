@@ -1,9 +1,12 @@
 """Konfiguracja bazy SQLite: połączenie, sesja, tworzenie tabel i seed katalogu.
 
 Plik bazy (app.db) leży w katalogu projektu, ale jest zgitignore'owany.
+W Dockerze (Etap 10) ścieżkę nadpisuje zmienna PAPUTRAIN_DB — baza leży
+wtedy w volume ./data, żeby przetrwała przebudowanie kontenera.
 """
 
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
@@ -15,7 +18,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import models  # noqa: F401 — import rejestruje tabele w SQLModel
 
-DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
+DB_PATH = Path(os.environ.get("PAPUTRAIN_DB", Path(__file__).resolve().parent.parent / "app.db"))
 CATALOG_JSON = Path(__file__).resolve().parent / "data" / "exercise_catalog.json"
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)

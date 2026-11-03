@@ -1,0 +1,54 @@
+# PapuTrain — serwer na VPS (Etap 10).
+#
+#   docker compose up -d --build   # start/rebuild: backend + frontend + caddy
+#   docker compose logs -f backend # podgląd logów
+#   docker compose down            # stop (dane w ./data przeżywają)
+#
+# Wymaga .env obok tego pliku (JWT_SECRET, GEMINI_API_KEY) — nigdy w obrazie.
+services:
+  backend:
+    build: .
+    image: paputrain-backend
+    restart: unless-stopped      # wstaje samo po restarcie maszyny
+    env_file: .env
+    volumes:
+      - ./data:/data             # baza SQLite (PAPUTRAIN_DB=/data/app.db)
+    # celowo BEZ "ports" — od świata backend jest osiągalny wyłącznie
+    # przez caddy; port 8000 istnieje tylko w sieci compose
+    logging:
+      driver: json-file          # rotacja logów, żeby nie zjadły dysku
+      options: { max-size: "10m", max-file: "3" }
+
+  frontend:
+    build: ./frontend
+    image: paputrain-frontend
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Jedyny wystawiony na świat: 80 (niezbędny Let's Encrypt do wydania
+  # certyfikatu) i 443 (ruch aplikacji). Certyfikaty trzymają się
+  # w nazwanym volume — bez tego każdy restart to nowy certyfikat.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - dane_caddy:/data
+      - konfig_caddy:/config
+    depends_on:
+      - backend
+      - frontend
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+# Certyfikaty/wewnętrzny stan Caddy — nazwane volumeny, żeby nie były
+# w katalogu projektu (Caddy pisze jako root wewnątrz kontenera):
+volumes:
+  dane_caddy:
+  konfig_caddy:

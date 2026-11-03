@@ -55,7 +55,7 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
 | Style | Tailwind CSS | Gotowe klasy CSS — szybko wychodzi ładny wygląd na telefon |
 | AI | Gemini API (model Flash) | Darmowy limit dzienny; klucz w pliku .env na serwerze |
 | Logowanie | JWT (token) + bcrypt | Token to podpisany bilet, który przeglądarka wysyła przy każdym zapytaniu; bcrypt to bezpieczne haszowanie haseł |
-| Deploy | Docker + docker-compose + Nginx + HTTPS (certbot) | Kontenery (paczki z aplikacją), Nginx jako brama przekazująca ruch, certbot = darmowy certyfikat HTTPS |
+| Deploy | Docker + docker-compose + Caddy + HTTPS | Kontenery (paczki z aplikacją), Caddy jako brama przekazująca ruch — sam pobiera i odnawia darmowe certyfikaty HTTPS (bez certbota) |
 
 ## Struktura danych (tabele w bazie)
 
@@ -135,7 +135,7 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 - **Etap 7 — progresja i trening na żywo:** odhaczanie treningów (z datą wykonania), oceny wykonania 1-5 w planie, uwagi do ćwiczeń, przerwy między seriami/ćwiczeniami widoczne w planie (jako informacja), zakładka "Ćwiczenia" z ocenami preferencji 1-5 w katalogu, blokada przycisku "Generuj następny tydzień" do czasu odhaczenia wszystkich treningów, generowanie z uwzględnieniem całej historii, zakładka "Stoper" (start/stop/reset) + pływający pasek stopera widoczny cały czas podczas treningu.
 - **Etap 8 — historia:** lista archiwalnych planów + widok szczegółów.
 - **Etap 9 — PWA:** manifest + ikony + instalacja na telefon.
-- **Etap 10 — deploy na VPS:** Dockerfile dla backendu i frontendu, docker-compose, Nginx jako reverse proxy (brama przekazująca ruch z portu 443 do aplikacji), HTTPS przez certbot.
+- **Etap 10 — deploy na VPS:** Dockerfile dla backendu i frontendu, docker-compose, Caddy jako reverse proxy (brama przekazująca ruch z portu 443 do aplikacji) z automatycznym HTTPS. Nazwa pod certyfikat: darmowa subdomena DuckDNS (np. paputrain.duckdns.org) wskazująca na IP VPS-a.
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 
@@ -144,4 +144,4 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 - Model Gemini: łańcuch fallbacku (limit darmowy jest dzienny per model — po wyczerpaniu
   backend sam przechodzi na kolejny): gemini-3.6-flash → gemini-3-flash-preview →
   gemini-3.5-flash-lite → gemini-3.1-flash-lite. Lista konfigurowalna w .env (GEMINI_MODELS).
-- Na VPS: aplikacja pod własną subdomeną/domeną z HTTPS; bez domeny — dostęp po IP + port, ale wtedy certyfikat jest trudniejszy.
+- Na VPS: aplikacja pod darmową subdomeną DuckDNS z HTTPS (Caddy pobiera certyfikat Let's Encrypt automatycznie). Zamiast Caddy może być Nginx + certbot (więcej konfiguracji, standard branżowy) — decyzja: Caddy dla prostoty.

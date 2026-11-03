@@ -8,6 +8,7 @@ __pycache__/
 
 # Baza danych
 *.db
+data/
 
 # Frontend (na Etap 3)
 node_modules/

@@ -1,0 +1,7 @@
+# Caddy — jedyne okno na świat: kończy TLS (certyfikat Let's Encrypt
+# pobierany i odnawiany automatycznie dla subdomeny DuckDNS) i rozdziela
+# ruch: /api/* do backendu, cała reszta do nginx z frontendem.
+paputrain.duckdns.org {
+	reverse_proxy /api/* backend:8000
+	reverse_proxy frontend:80
+}

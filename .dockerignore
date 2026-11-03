@@ -1,0 +1,17 @@
+# Tylko backend — frontend ma własny Dockerfile w frontend/.
+frontend
+
+# Środowisko i cache Pythona
+.venv
+__pycache__
+*.pyc
+
+# Sekrety NIGDY w obrazie (.env trafia przez env_file w compose)
+.env
+
+# Baza lokalna (produkcyjna leży w volume ./data na VPS)
+*.db
+data
+
+.git
+.claude
