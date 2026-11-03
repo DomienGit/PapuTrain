@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, getToken } from './api'
 import StopWatch, { formatTime } from './components/Stopwatch'
 import EquipmentExercises from './pages/EquipmentExercises'
+import History from './pages/History'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
@@ -14,7 +15,7 @@ export default function App() {
   const [username, setUsername] = useState(null)
   const [checking, setChecking] = useState(Boolean(getToken()))
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
-  const [tab, setTab] = useState('home') // 'home' | 'equipment' | 'stoper'
+  const [tab, setTab] = useState('home') // 'home' | 'equipment' | 'stoper' | 'historia'
 
   // Stoper (Etap 7): baseMs = zebrany czas z poprzednich "kolejek",
   // startedAt = moment ostatniego startu. Wyświetlany czas to suma.
@@ -88,6 +89,7 @@ export default function App() {
     <div className="min-h-dvh bg-zinc-100 pb-20">
       {tab === 'home' && <Home username={username} />}
       {tab === 'equipment' && <EquipmentExercises />}
+      {tab === 'historia' && <History />}
       {tab === 'stoper' && (
         <StopWatch
           elapsedMs={elapsedMs}
@@ -115,10 +117,11 @@ export default function App() {
         <NavItem active={tab === 'home'} label="Główny" onClick={() => setTab('home')} />
         <NavItem
           active={tab === 'equipment'}
-          label="Sprzęt i ćwiczenia"
+          label="Sprzęt"
           onClick={() => setTab('equipment')}
         />
         <NavItem active={tab === 'stoper'} label="Stoper" onClick={() => setTab('stoper')} />
+        <NavItem active={tab === 'historia'} label="Historia" onClick={() => setTab('historia')} />
       </nav>
     </div>
   )

@@ -196,6 +196,37 @@ def get_active(session: SessionDep) -> dict:
     return _plan_to_dict(session, active)
 
 
+@router.get("/archived")
+def list_archived(session: SessionDep) -> list[dict]:
+    """Lista archiwalnych planów (Etap 8) — skrót, bez ćwiczeń; pełny plan osobno."""
+    plans = session.exec(
+        select(Plan).where(Plan.status == "archived").order_by(Plan.week_number)  # type: ignore[arg-type]
+    ).all()
+    result = []
+    for plan in plans:
+        workouts = session.exec(
+            select(Workout).where(Workout.plan_id == plan.id)  # type: ignore[arg-type]
+        ).all()
+        result.append(
+            {
+                "id": plan.id,
+                "week_number": plan.week_number,
+                "week_title": plan.week_title,
+                "workouts_total": len(workouts),
+                "workouts_done": sum(1 for w in workouts if w.done),
+            }
+        )
+    return result
+
+
+@router.get("/archived/{plan_id}")
+def get_archived(plan_id: int, session: SessionDep) -> dict:
+    plan = session.get(Plan, plan_id)
+    if plan is None or plan.status != "archived":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego archiwalnego planu")
+    return _plan_to_dict(session, plan)
+
+
 # --- Etap 6: panel szkicu (zatwierdzanie, edycja ręczna, prośba do AI) ---
 
 # Edycja szkicu pozwala uporządkować plan PRZED zatwierdzeniem; aktywny plan
