@@ -19,6 +19,12 @@ from app.models import CatalogExercise, Equipment, Profile
 
 logger = logging.getLogger(__name__)
 
+# Przy przeciążeniu (5xx/timeout) powtarzamy TEN SAM model do tej liczby prób,
+# z pauzą — bywa, że chmura "dopisze" za chwilę. Limit dzienny (429) i nieosiągalny
+# model (404) nie mają sensu ponawiać — od razu bierzemy kolejny z listy.
+ATTEMPTS_PER_MODEL = 3
+RETRY_PAUSE_S = 3
+
 GYM_NAME = "siłownia"  # rozpoznawana po nazwie (spójnie z frontendem)
 HOME_SUBSTITUTES = "stół, krzesło, ściana, podłoga"
 
@@ -163,41 +169,64 @@ def generate_plan(prompt: str) -> dict:
 
     problems: list[str] = []
     for model in settings.gemini_models_list:
-        start = time.monotonic()
-        try:
-            logger.info("Gemini: pytam model %s", model)
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",  # wymuszony tryb JSON
-                    temperature=0.7,
-                ),
-            )
-        except (genai_errors.ClientError, genai_errors.ServerError) as err:
-            code = _status_code(err)
-            if code == 429 or code == 404 or (code is not None and 500 <= code < 600):
-                logger.warning("Gemini: %s odmówił (HTTP %s) — następny model", model, code)
-                problems.append(f"{model} (HTTP {code})")
-                continue
-            # 401/403 (zły klucz) czy 400 (złe zapytanie) — zmiana modelu nie pomoże
-            raise AiError(f"Gemini odrzucił zapytanie (HTTP {code}): {err}") from err
-        except httpx.HTTPError as err:
-            # np. timeout — model przyjęty, ale nie odpowiada (widzieliśmy to na 3.8-flash)
-            logger.warning("Gemini: %s nie odpowiedział (%s) — następny model", model, type(err).__name__)
-            problems.append(f"{model} (brak odpowiedzi)")
-            continue
+        for attempt in range(1, ATTEMPTS_PER_MODEL + 1):
+            start = time.monotonic()
+            try:
+                logger.info("Gemini: pytam model %s (próba %d/%d)", model, attempt, ATTEMPTS_PER_MODEL)
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",  # wymuszony tryb JSON
+                        temperature=0.7,
+                    ),
+                )
+            except (genai_errors.ClientError, genai_errors.ServerError) as err:
+                code = _status_code(err)
+                if code == 429 or code == 404:
+                    # limit dzienny / model nieosiągalny — ponawianie nic nie da
+                    logger.warning("Gemini: %s odmówił (HTTP %s) — następny model", model, code)
+                    problems.append(f"{model} (HTTP {code})")
+                    break
+                if code is not None and 500 <= code < 600:
+                    if attempt < ATTEMPTS_PER_MODEL:
+                        logger.warning(
+                            "Gemini: %s przeciążony (HTTP %s) — ponawiam za %d s",
+                            model, code, RETRY_PAUSE_S,
+                        )
+                        time.sleep(RETRY_PAUSE_S)
+                        continue
+                    logger.warning("Gemini: %s nadal przeciążony po %d próbach — następny model", model, attempt)
+                    problems.append(f"{model} (HTTP {code})")
+                    break
+                # 401/403 (zły klucz) czy 400 (złe zapytanie) — zmiana modelu nie pomoże
+                raise AiError(f"Gemini odrzucił zapytanie (HTTP {code}): {err}") from err
+            except httpx.HTTPError as err:
+                # np. timeout — model przyjęty, ale nie odpowiada (widzieliśmy to na 3.8-flash)
+                if attempt < ATTEMPTS_PER_MODEL:
+                    logger.warning(
+                        "Gemini: %s nie odpowiedział (%s) — ponawiam za %d s",
+                        model, type(err).__name__, RETRY_PAUSE_S,
+                    )
+                    time.sleep(RETRY_PAUSE_S)
+                    continue
+                logger.warning("Gemini: %s nadal nie odpowiada po %d próbach — następny model", model, attempt)
+                problems.append(f"{model} (brak odpowiedzi)")
+                break
 
-        elapsed = time.monotonic() - start
-        text = (response.text or "").strip()
-        if not text:
-            raise AiError("Gemini zwrócił pustą odpowiedź — spróbuj ponownie")
-        try:
-            result = json.loads(text)
-        except json.JSONDecodeError as err:
-            raise AiError("Gemini zwrócił odpowiedź, która nie jest poprawnym JSON-em") from err
-        logger.info("Gemini: model %s odpowiedział w %.1f s", model, elapsed)
-        return result
+            elapsed = time.monotonic() - start
+            text = (response.text or "").strip()
+            if not text:
+                raise AiError("Gemini zwrócił pustą odpowiedź — spróbuj ponownie")
+            try:
+                result = json.loads(text)
+            except json.JSONDecodeError as err:
+                raise AiError("Gemini zwrócił odpowiedź, która nie jest poprawnym JSON-em") from err
+            if attempt > 1:
+                logger.info("Gemini: model %s odpowiedział dopiero przy próbie %d (łącznie %.1f s)", model, attempt, elapsed)
+            else:
+                logger.info("Gemini: model %s odpowiedział w %.1f s", model, elapsed)
+            return result
 
     raise AiError(
         "Wszystkie modele wyczerpały limit albo nie odpowiadają (" + "; ".join(problems) + "). "
