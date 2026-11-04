@@ -308,6 +308,10 @@ def generate_plan(prompt: str) -> dict:
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",  # wymuszony tryb JSON
                         temperature=0.7,
+                        # Twardy limit długości odpowiedzi — patologicznie długi
+                        # output nie zje darmowego limitu tokenów, zanim walidacja
+                        # ją odrzuci (review 2026-11-04, pkt 8).
+                        max_output_tokens=4096,
                     ),
                 )
             except (genai_errors.ClientError, genai_errors.ServerError) as err:
@@ -328,8 +332,14 @@ def generate_plan(prompt: str) -> dict:
                     logger.warning("Gemini: %s nadal przeciążony po %d próbach — następny model", model, attempt)
                     problems.append(f"{model} (HTTP {code})")
                     break
-                # 401/403 (zły klucz) czy 400 (złe zapytanie) — zmiana modelu nie pomoże
-                raise AiError(f"Gemini odrzucił zapytanie (HTTP {code}): {err}") from err
+                # 401/403 (zły klucz) czy 400 (złe zapytanie) — zmiana modelu nie pomoże.
+                # Pełny tekst wyjątku SDK (może zawierać URL z kluczem API) idzie
+                # tylko do logów serwera — klient dostaje komunikat ogólny
+                # (review 2026-11-04, pkt 2).
+                logger.exception("Gemini odrzucił zapytanie (HTTP %s)", code)
+                raise AiError(
+                    f"Gemini odrzucił zapytanie (HTTP {code}) — szczegóły w logach serwera"
+                ) from err
             except httpx.HTTPError as err:
                 # np. timeout — model przyjęty, ale nie odpowiada (widzieliśmy to na 3.8-flash)
                 if attempt < ATTEMPTS_PER_MODEL:

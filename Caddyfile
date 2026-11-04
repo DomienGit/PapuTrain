@@ -2,6 +2,17 @@
 # pobierany i odnawiany automatycznie dla subdomeny DuckDNS) i rozdziela
 # ruch: /api/* do backendu, cała reszta do nginx z frontendem.
 paputrain.duckdns.org {
+	# Nagłówki bezpieczeństwa dla frontendu i /api (review 2026-11-04, pkt 3):
+	# - HSTS: przeglądarka przez rok używa tylko HTTPS
+	# - nosniff: nie zgaduje typu MIME plików
+	# - X-Frame-Options: nikt nie osadzi aplikacji w ramce (clickjacking)
+	# - Referrer-Policy: nie wysyłaj pełnego adresu w nagłówku Referer
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 	reverse_proxy /api/* backend:8000
 	reverse_proxy frontend:80
 }

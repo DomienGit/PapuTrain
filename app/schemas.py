@@ -4,7 +4,12 @@ To modele "tylko do walidacji" — nie są tabelami w bazie. Pydantic sprawdza
 tu np. zakresy (ocena 1-5), zanim dane dotkną bazy.
 """
 
+from typing import Annotated
+
 from sqlmodel import Field, SQLModel
+
+# Krótki string (np. nazwa sprzętu na liście) — limit długości elementów list.
+ShortStr = Annotated[str, Field(max_length=100)]
 
 
 class ProfileUpsert(SQLModel):
@@ -33,7 +38,10 @@ class CatalogExerciseCreate(SQLModel):
     """Własne ćwiczenie dopisywane przez użytkownika (source: "custom")."""
 
     name: str = Field(min_length=1, max_length=150)
-    required_equipment: list[str] = Field(default_factory=list)
+    # Limit liczby elementów (20) i długości każdego (ShortStr = 100 znaków) —
+    # bez tego można było zapisać MB danych w jednej liście
+    # (review 2026-11-04, pkt 7).
+    required_equipment: list[ShortStr] = Field(default_factory=list, max_length=20)
 
 
 class CatalogExerciseUpdate(SQLModel):

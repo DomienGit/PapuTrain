@@ -16,6 +16,12 @@ COPY . .
 
 ENV PAPUTRAIN_DB=/data/app.db
 
+# Nie-root: zwykły użytkownik w kontenerze (review 2026-11-04, pkt 6).
+# UID 1000 — na VPS volume ./data musi należeć do tego UID:
+#   chown -R 1000:1000 /opt/paputrain/data && chmod 600 /opt/paputrain/data/app.db
+RUN useradd --create-home appuser
+USER appuser
+
 # Uvicorn nasłuchuje na wszystkich interfejsach — w sieci compose
 # (od świata chroni go Caddy, kontener nie wystawia portów na host).
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
