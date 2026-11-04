@@ -55,7 +55,7 @@ export default function Home({ username }) {
         plan.status === 'draft' ? (
           <DraftPanel plan={plan} onChange={setPlan} onRejected={() => setPlan(null)} />
         ) : (
-          <PlanView plan={plan} onGenerate={generate} generating={busy} />
+          <PlanView plan={plan} onChange={setPlan} onGenerate={generate} generating={busy} />
         )
       ) : loaded ? (
         <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-sm">
@@ -77,14 +77,18 @@ export default function Home({ username }) {
   )
 }
 
-function PlanView({ plan, onGenerate, generating }) {
+function PlanView({ plan, onChange, onGenerate, generating }) {
   const [error, setError] = useState('')
 
-  // Wspólny helper PATCH dla odhaczania i ocen — zwraca odświeżony plan.
+  // Wspólny helper PATCH dla odhaczania i ocen. Backend zwraca cały
+  // odświeżony plan — podmieniamy go w stanie rodzica, żeby gwiazdki
+  // i odhaczenia przerysowywały się od razu, bez restartu aplikacji.
   async function patchPlan(path, body) {
     setError('')
     try {
-      return await api(path, { method: 'PATCH', body: JSON.stringify(body) })
+      const updated = await api(path, { method: 'PATCH', body: JSON.stringify(body) })
+      onChange(updated)
+      return updated
     } catch (err) {
       setError(err.message)
       return null
