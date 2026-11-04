@@ -101,8 +101,9 @@ class Exercise(SQLModel, table=True):
     workout_id: int = Field(foreign_key="workouts.id", index=True)
     name: str
     sets: int = 1
-    reps: str = ""  # np. "8-12" albo "40 s"
+    reps: str = ""  # np. "8-12" albo "40 s" — SUGESTIA AI (placeholder w UI)
     rest_between_sets_s: int | None = None
-    load: str = ""  # obciążenie / opis
+    load: str = ""  # obciążenie w kg od AI, np. "40 kg" / "masa ciała"
+    performed: str = ""  # FAKTYCZNIE zrobione, np. "3×12" — wpisuje użytkownik (req 21)
     rating: int | None = None
     note: str = ""  # uwaga, np. "boli kolano przy przysiadzie"

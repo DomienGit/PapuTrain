@@ -82,6 +82,11 @@ def _history_lines(history: list[tuple[Workout, list[Exercise]]]) -> list[str]:
         lines.append(f"- {workout.name} ({status}):")
         for ex in exercises:
             parts = [f"{ex.name} {ex.sets} × {ex.reps}"]
+            if ex.load:
+                parts.append(f"obciążenie: {ex.load}")
+            if ex.performed:
+                # FAKTYCZNIE zrobione (req 21) — to jest realna wydajność, nie sugestia
+                parts.append(f"zrobiłem: {ex.performed}")
             if ex.rest_between_sets_s is not None:
                 parts.append(f"przerwa {ex.rest_between_sets_s} s")
             if ex.rating is not None:
@@ -153,13 +158,19 @@ def build_generation_prompt(
         "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
         f"7. Tytuł tygodnia: \"Tydzień {week_number}\".",
         "8. Wszystkie teksty (nazwy treningów, uwagi, notatka trenera) po polsku.",
+        "9. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
+        "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\", \"2×10 kg hantle\"); "
+        "dla ćwiczeń z masą ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
     ]
     if history:
         rules.append(
-            "9. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5) "
-            "i uwagami. Oceny 4-5 = szło dobrze/za łatwo: progresuj (więcej serii/powtórzeń, "
-            "krótsze przerwy albo trudniejsza wersja ćwiczenia). Oceny 1-2 = za trudne: "
-            "zmniejsz trudność lub zamień ćwiczenie. Uwagi (np. ból stawu) respektuj."
+            "10. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5), "
+            "uwagami i tym, co NAPRAWDĘ zrobiłem (\"zrobiłem\") w porównaniu z moją sugestią. "
+            "To porównanie to moja realna wydajność: dobieraj kolejne serie, powtórzenia "
+            "i obciążenia na jego bazie, nie tylko na ocenach. Oceny 4-5 i pełne wykonanie "
+            "sugestii = progresuj (więcej serii/powtórzeń, cięższe obciążenie, krótsze "
+            "przerwy albo trudniejsza wersja ćwiczenia). Oceny 1-2 lub niewykonanie "
+            "sugestii = zmniejsz trudność lub zamień ćwiczenie. Uwagi (np. ból stawu) respektuj."
         )
 
     body.extend(["", "TWARDE ZASADY:"])
@@ -176,8 +187,8 @@ def build_generation_prompt(
       "workout_name": "Trening 1 — góra ciała",
       "rest_between_exercises": 60,
       "exercises": [
-        {"name": "Pompki", "sets": 4, "reps": "8-12", "rest_between_sets": 90,
-         "notes": "tempo wolne na zejściu"}
+        {"name": "Wyciskanie hantli na ławce", "sets": 3, "reps": "10-12", "rest_between_sets": 90,
+         "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
       ]
     }
   ],
@@ -242,6 +253,10 @@ def build_workout_revision_prompt(
     body.append("- obecne ćwiczenia:")
     for ex in target_exercises:
         line = f"  - {ex.name} ({ex.sets} × {ex.reps}, przerwa {ex.rest_between_sets_s} s"
+        if ex.load:
+            line += f", obciążenie: {ex.load}"
+        if ex.performed:
+            line += f", poprzednio zrobiłem: {ex.performed}"
         if ex.note:
             line += f", uwaga: {ex.note}"
         body.append(line + ")")
@@ -259,11 +274,14 @@ def build_workout_revision_prompt(
             "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
             "pełnego dostępu do siłowni.",
             "3. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach).",
-            "4. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
+            "4. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
+            "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\"); dla ćwiczeń z masą "
+            "ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
+            "5. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
             "podopieczny. Nie musisz wymieniać wszystkiego.",
-            "5. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
-            "6. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
-            "7. Wszystkie teksty po polsku.",
+            "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+            "7. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
+            "8. Wszystkie teksty po polsku.",
             "",
             "ODPOWIEDŹ: zwróć WYŁĄCZNIE poprawny JSON (bez komentarzy i markdown) "
             "dokładnie w tej strukturze:",
@@ -271,8 +289,8 @@ def build_workout_revision_prompt(
   "workout_name": "Trening 1 — góra ciała",
   "rest_between_exercises": 60,
   "exercises": [
-    {"name": "Pompki", "sets": 4, "reps": "8-12", "rest_between_sets": 90,
-     "notes": "tempo wolne na zejściu"}
+    {"name": "Wyciskanie hantli na ławce", "sets": 3, "reps": "10-12", "rest_between_sets": 90,
+     "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
   ]
 }""",
         ]

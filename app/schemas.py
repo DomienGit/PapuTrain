@@ -57,6 +57,7 @@ class AiExercise(SQLModel):
     sets: int = Field(ge=1, le=20)
     reps: str = Field(min_length=1, max_length=100)
     rest_between_sets: int = Field(ge=0, le=600)  # sekundy
+    load: str = Field(default="", max_length=100)  # obciążenie, np. "40 kg"
     notes: str = Field(default="", max_length=500)
 
 
@@ -105,10 +106,12 @@ class WorkoutDoneUpdate(SQLModel):
 
 
 class ExerciseFeedbackUpdate(SQLModel):
-    """Ocena wykonania (1-5) i uwaga do ćwiczenia w aktywnym planie."""
+    """Ocena wykonania (1-5), uwaga i FAKTYCZNIE zrobione serie×powtórzenia
+    do ćwiczenia w aktywnym planie (req 21)."""
 
     rating: int | None = Field(default=None, ge=1, le=5)
     note: str | None = Field(default=None, max_length=500)
+    performed: str | None = Field(default=None, max_length=50)  # np. "3×12"
 
 
 class LoginRequest(SQLModel):

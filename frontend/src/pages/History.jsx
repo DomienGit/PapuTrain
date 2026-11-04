@@ -107,10 +107,12 @@ function ArchivedPlanDetail({ plan, onBack }) {
                     <span className="text-zinc-900">{ex.name}</span>
                     <span className="shrink-0 text-sm text-zinc-500">
                       {ex.sets} × {ex.reps}
+                      {ex.load && ` · ${ex.load}`}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500">
                     przerwa {ex.rest_between_sets_s} s
+                    {ex.performed && ` · zrobiłem: ${ex.performed}`}
                     {ex.rating != null && ` · ocena: ${'★'.repeat(ex.rating)}`}
                     {ex.note && ` · ${ex.note}`}
                   </p>

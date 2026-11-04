@@ -58,6 +58,7 @@ def _plan_to_dict(session, plan: Plan) -> dict:
                         "reps": ex.reps,
                         "rest_between_sets_s": ex.rest_between_sets_s,
                         "load": ex.load,
+                        "performed": ex.performed,
                         "rating": ex.rating,
                         "note": ex.note,
                     }
@@ -171,6 +172,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
                     sets=exercise_data.sets,
                     reps=exercise_data.reps,
                     rest_between_sets_s=exercise_data.rest_between_sets,
+                    load=exercise_data.load,
                     note=exercise_data.notes,
                 )
             )
@@ -367,6 +369,7 @@ def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: Sessi
                 sets=exercise_data.sets,
                 reps=exercise_data.reps,
                 rest_between_sets_s=exercise_data.rest_between_sets,
+                load=exercise_data.load,
                 note=exercise_data.notes,
             )
         )
@@ -409,7 +412,7 @@ def set_workout_done(workout_id: int, data: WorkoutDoneUpdate, session: SessionD
 def set_exercise_feedback(
     workout_id: int, exercise_id: int, data: ExerciseFeedbackUpdate, session: SessionDep
 ) -> dict:
-    """Ocena wykonania (1-5) i uwaga do ćwiczenia — idą do AI przy kolejnym tygodniu."""
+    """Ocena wykonania (1-5), uwaga i "zrobiłem" — idą do AI przy kolejnym tygodniu."""
     workout = _get_active_workout_or_404(session, workout_id)
     exercise = session.get(Exercise, exercise_id)
     if exercise is None or exercise.workout_id != workout_id:
@@ -418,6 +421,8 @@ def set_exercise_feedback(
         exercise.rating = data.rating
     if data.note is not None:
         exercise.note = data.note
+    if data.performed is not None:
+        exercise.performed = data.performed
     session.add(exercise)
     session.commit()
     return _plan_to_dict(session, session.get(Plan, workout.plan_id))

@@ -287,6 +287,7 @@ function ExerciseRow({ workout, exercise, onChange, setError }) {
         <span className="text-zinc-900">{exercise.name}</span>
         <span className="shrink-0 text-sm text-zinc-500">
           {exercise.sets} × {exercise.reps}
+          {exercise.load && ` · ${exercise.load}`}
         </span>
       </div>
       <p className="text-xs text-zinc-500">
@@ -317,6 +318,7 @@ function ExerciseEditForm({ workout, exercise, onChange, onClose, setError }) {
     sets: exercise.sets,
     reps: exercise.reps,
     rest_between_sets_s: exercise.rest_between_sets_s ?? '',
+    load: exercise.load || '',
     note: exercise.note || '',
   })
   const [saving, setSaving] = useState(false)
@@ -339,6 +341,7 @@ function ExerciseEditForm({ workout, exercise, onChange, onClose, setError }) {
             ...(form.rest_between_sets_s !== '' && {
               rest_between_sets_s: Number(form.rest_between_sets_s),
             }),
+            load: form.load,
             note: form.note,
           }),
         }),
@@ -381,6 +384,12 @@ function ExerciseEditForm({ workout, exercise, onChange, onClose, setError }) {
           className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
         />
       </div>
+      <input
+        value={form.load}
+        onChange={(e) => set('load', e.target.value)}
+        placeholder="obciążenie (np. 40 kg, masa ciała)"
+        className="mt-2 w-full rounded-lg border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
+      />
       <input
         value={form.note}
         onChange={(e) => set('note', e.target.value)}
