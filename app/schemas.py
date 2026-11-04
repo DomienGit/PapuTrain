@@ -106,12 +106,13 @@ class WorkoutDoneUpdate(SQLModel):
 
 
 class ExerciseFeedbackUpdate(SQLModel):
-    """Ocena wykonania (1-5), uwaga i FAKTYCZNIE zrobione serie×powtórzenia
-    do ćwiczenia w aktywnym planie (req 21)."""
+    """Ocena wykonania (1-5), FAKTYCZNIE zrobione serie×powtórzenia i użyte
+    obciążenie do ćwiczenia w aktywnym planie (req 21)."""
 
     rating: int | None = Field(default=None, ge=1, le=5)
-    note: str | None = Field(default=None, max_length=500)
+    note: str | None = Field(default=None, max_length=500)  # bez edycji z UI; zostaje dla zgodności API
     performed: str | None = Field(default=None, max_length=50)  # np. "3×12"
+    load: str | None = Field(default=None, max_length=100)  # np. "40 kg"
 
 
 class LoginRequest(SQLModel):

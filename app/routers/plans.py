@@ -423,6 +423,8 @@ def set_exercise_feedback(
         exercise.note = data.note
     if data.performed is not None:
         exercise.performed = data.performed
+    if data.load is not None:
+        exercise.load = data.load
     session.add(exercise)
     session.commit()
     return _plan_to_dict(session, session.get(Plan, workout.plan_id))

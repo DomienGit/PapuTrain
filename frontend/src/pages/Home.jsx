@@ -185,25 +185,16 @@ function WorkoutSection({ workout, patchPlan }) {
 }
 
 function ExerciseFeedback({ workout, exercise, patchPlan }) {
-  const [noteOpen, setNoteOpen] = useState(false)
-  const [noteText, setNoteText] = useState(exercise.note || '')
-  // "Zrobiłem" (req 21): faktyczne serie×powtórzenia; placeholder = sugestia AI.
+  // "Zrobiłem" i kg (req 21): faktyczne wykonanie; wartość/placeholder = sugestia AI.
   const [performedText, setPerformedText] = useState(exercise.performed || '')
+  const [loadText, setLoadText] = useState(exercise.load || '')
 
-  async function saveNote() {
-    const updated = await patchPlan(
-      `/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`,
-      { note: noteText },
-    )
-    if (updated) setNoteOpen(false)
-  }
-
-  // Zapis "zrobiłem" przy wyjściu z pola (blur) lub Enter; puste pole czyści wpis.
-  async function savePerformed() {
-    const value = performedText.trim()
-    if (value === (exercise.performed || '')) return // bez zmian — nie dzwoń do API
+  // Zapis przy wyjściu z pola (blur) lub Enter; puste pole czyści wpis.
+  async function saveField(field, value) {
+    const trimmed = value.trim()
+    if (trimmed === (exercise[field] || '')) return // bez zmian — nie dzwoń do API
     await patchPlan(`/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`, {
-      performed: value,
+      [field]: trimmed,
     })
   }
 
@@ -215,11 +206,8 @@ function ExerciseFeedback({ workout, exercise, patchPlan }) {
           {exercise.sets} × {exercise.reps}
         </span>
       </div>
-      <p className="text-xs text-zinc-500">
-        przerwa {exercise.rest_between_sets_s} s
-        {exercise.load && ` · ${exercise.load}`}
-      </p>
-      <div className="mt-1 flex items-center gap-3">
+      <p className="text-xs text-zinc-500">przerwa {exercise.rest_between_sets_s} s</p>
+      <div className="mt-1">
         <Stars
           value={exercise.rating}
           onChange={(n) =>
@@ -229,47 +217,36 @@ function ExerciseFeedback({ workout, exercise, patchPlan }) {
           }
           label={`ocena wykonania: ${exercise.name}`}
         />
-        <button
-          onClick={() => setNoteOpen(!noteOpen)}
-          className="text-xs text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline"
-        >
-          {exercise.note ? 'zmień uwagę' : '+ uwaga'}
-        </button>
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <span className="text-xs text-zinc-500">zrobiłem:</span>
-        <input
-          value={performedText}
-          onChange={(e) => setPerformedText(e.target.value)}
-          onBlur={savePerformed}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          placeholder={`${exercise.sets}×${exercise.reps}`} // sugestia AI jako wzór
-          inputMode="numeric"
-          className="w-24 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
-          aria-label={`faktycznie zrobione serie×powtórzenia: ${exercise.name}`}
-        />
-        {exercise.performed && (
-          <span className="text-xs text-emerald-600">zapisane</span>
-        )}
-      </div>
-      {exercise.note && !noteOpen && (
-        <p className="mt-1 text-xs text-zinc-600">„{exercise.note}”</p>
-      )}
-      {noteOpen && (
-        <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex items-center gap-3">
+        <label className="flex items-center gap-1.5">
+          <span className="text-xs text-zinc-500">kg:</span>
           <input
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            placeholder="np. boli kolano przy przysiadzie"
-            className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
+            value={loadText}
+            onChange={(e) => setLoadText(e.target.value)}
+            onBlur={(e) => saveField('load', e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder="np. 40 kg"
+            className="w-20 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
+            aria-label={`użyte obciążenie: ${exercise.name}`}
           />
-          <button
-            onClick={saveNote}
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
-          >
-            Zapisz
-          </button>
-        </div>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className="text-xs text-zinc-500">zrobiłem:</span>
+          <input
+            value={performedText}
+            onChange={(e) => setPerformedText(e.target.value)}
+            onBlur={(e) => saveField('performed', e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder={`${exercise.sets}×${exercise.reps}`} // sugestia AI jako wzór
+            inputMode="numeric"
+            className="w-24 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
+            aria-label={`faktycznie zrobione serie×powtórzenia: ${exercise.name}`}
+          />
+        </label>
+      </div>
+      {exercise.note && (
+        <p className="mt-1 text-xs text-zinc-600">„{exercise.note}”</p>
       )}
     </li>
   )
