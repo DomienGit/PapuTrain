@@ -158,11 +158,12 @@ function WorkoutSection({ workout, patchPlan }) {
       </div>
 
       <ul className="mt-3 divide-y divide-zinc-100">
-        {workout.exercises.map((exercise) => (
+        {workout.exercises.map((exercise, index) => (
           <ExerciseFeedback
             key={exercise.id}
             workout={workout}
             exercise={exercise}
+            number={index + 1}
             patchPlan={patchPlan}
           />
         ))}
@@ -184,8 +185,10 @@ function WorkoutSection({ workout, patchPlan }) {
   )
 }
 
-function ExerciseFeedback({ workout, exercise, patchPlan }) {
-  // "Zrobiłem" i kg (req 21): faktyczne wykonanie; wartość/placeholder = sugestia AI.
+function ExerciseFeedback({ workout, exercise, number, patchPlan }) {
+  // Karta rozwijana (req 21): zwinięta = co do zrobienia; klik rozwija
+  // panel z oceną, "zrobiłem", kg i notatką AI (tylko do czytania).
+  const [open, setOpen] = useState(false)
   const [performedText, setPerformedText] = useState(exercise.performed || '')
   const [loadText, setLoadText] = useState(exercise.load || '')
 
@@ -200,53 +203,65 @@ function ExerciseFeedback({ workout, exercise, patchPlan }) {
 
   return (
     <li className="py-2">
-      <div className="flex justify-between gap-2">
-        <span className="text-zinc-900">{exercise.name}</span>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-baseline justify-between gap-2 text-left"
+      >
+        <span className="min-w-0 text-zinc-900">
+          {number}. {exercise.name}
+          {exercise.muscle_group && (
+            <span className="text-zinc-400"> ({exercise.muscle_group})</span>
+          )}
+        </span>
         <span className="shrink-0 text-sm text-zinc-500">
           {exercise.sets} × {exercise.reps}
+          {exercise.load && ` · ${exercise.load}`}
         </span>
-      </div>
+      </button>
       <p className="text-xs text-zinc-500">przerwa {exercise.rest_between_sets_s} s</p>
-      <div className="mt-1">
-        <Stars
-          value={exercise.rating}
-          onChange={(n) =>
-            patchPlan(`/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`, {
-              rating: n,
-            })
-          }
-          label={`ocena wykonania: ${exercise.name}`}
-        />
-      </div>
-      <div className="mt-2 flex items-center gap-3">
-        <label className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-500">kg:</span>
-          <input
-            value={loadText}
-            onChange={(e) => setLoadText(e.target.value)}
-            onBlur={(e) => saveField('load', e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            placeholder="np. 40 kg"
-            className="w-20 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
-            aria-label={`użyte obciążenie: ${exercise.name}`}
+      {open && (
+        <div className="mt-2 rounded-lg bg-zinc-50 p-2.5">
+          <Stars
+            value={exercise.rating}
+            onChange={(n) =>
+              patchPlan(`/api/plans/active/workouts/${workout.id}/exercises/${exercise.id}`, {
+                rating: n,
+              })
+            }
+            label={`ocena wykonania: ${exercise.name}`}
           />
-        </label>
-        <label className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-500">zrobiłem:</span>
-          <input
-            value={performedText}
-            onChange={(e) => setPerformedText(e.target.value)}
-            onBlur={(e) => saveField('performed', e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            placeholder={`${exercise.sets}×${exercise.reps}`} // sugestia AI jako wzór
-            inputMode="numeric"
-            className="w-24 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
-            aria-label={`faktycznie zrobione serie×powtórzenia: ${exercise.name}`}
-          />
-        </label>
-      </div>
-      {exercise.note && (
-        <p className="mt-1 text-xs text-zinc-600">„{exercise.note}”</p>
+          <div className="mt-2 flex items-center gap-3">
+            <label className="flex items-center gap-1.5">
+              <span className="text-xs text-zinc-500">kg:</span>
+              <input
+                value={loadText}
+                onChange={(e) => setLoadText(e.target.value)}
+                onBlur={(e) => saveField('load', e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                placeholder="np. 40 kg"
+                className="w-20 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
+                aria-label={`użyte obciążenie: ${exercise.name}`}
+              />
+            </label>
+            <label className="flex items-center gap-1.5">
+              <span className="text-xs text-zinc-500">zrobiłem:</span>
+              <input
+                value={performedText}
+                onChange={(e) => setPerformedText(e.target.value)}
+                onBlur={(e) => saveField('performed', e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                placeholder={`${exercise.sets}×${exercise.reps}`} // sugestia AI jako wzór
+                inputMode="numeric"
+                className="w-24 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
+                aria-label={`faktycznie zrobione serie×powtórzenia: ${exercise.name}`}
+              />
+            </label>
+          </div>
+          {exercise.note && (
+            <p className="mt-2 text-xs text-zinc-600">„{exercise.note}”</p>
+          )}
+        </div>
       )}
     </li>
   )

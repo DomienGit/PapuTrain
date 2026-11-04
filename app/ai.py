@@ -161,10 +161,13 @@ def build_generation_prompt(
         "9. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
         "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\", \"2×10 kg hantle\"); "
         "dla ćwiczeń z masą ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
+        "10. Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
+        "dobraną z tej listy: klatka, plecy, nogi, barki, biceps, triceps, brzuch, "
+        "pośladki, łydki, przedramiona, całe ciało.",
     ]
     if history:
         rules.append(
-            "10. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5), "
+            "11. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5), "
             "uwagami i tym, co NAPRAWDĘ zrobiłem (\"zrobiłem\") w porównaniu z moją sugestią. "
             "To porównanie to moja realna wydajność: dobieraj kolejne serie, powtórzenia "
             "i obciążenia na jego bazie, nie tylko na ocenach. Oceny 4-5 i pełne wykonanie "
@@ -187,8 +190,8 @@ def build_generation_prompt(
       "workout_name": "Trening 1 — góra ciała",
       "rest_between_exercises": 60,
       "exercises": [
-        {"name": "Wyciskanie hantli na ławce", "sets": 3, "reps": "10-12", "rest_between_sets": 90,
-         "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
+        {"name": "Wyciskanie hantli na ławce", "muscle_group": "klatka", "sets": 3, "reps": "10-12",
+         "rest_between_sets": 90, "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
       ]
     }
   ],
@@ -277,11 +280,14 @@ def build_workout_revision_prompt(
             "4. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
             "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\"); dla ćwiczeń z masą "
             "ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
-            "5. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
+            "5. Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
+            "dobraną z tej listy: klatka, plecy, nogi, barki, biceps, triceps, brzuch, "
+            "pośladki, łydki, przedramiona, całe ciało.",
+            "6. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
             "podopieczny. Nie musisz wymieniać wszystkiego.",
-            "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
-            "7. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
-            "8. Wszystkie teksty po polsku.",
+            "7. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+            "8. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
+            "9. Wszystkie teksty po polsku.",
             "",
             "ODPOWIEDŹ: zwróć WYŁĄCZNIE poprawny JSON (bez komentarzy i markdown) "
             "dokładnie w tej strukturze:",
@@ -289,8 +295,8 @@ def build_workout_revision_prompt(
   "workout_name": "Trening 1 — góra ciała",
   "rest_between_exercises": 60,
   "exercises": [
-    {"name": "Wyciskanie hantli na ławce", "sets": 3, "reps": "10-12", "rest_between_sets": 90,
-     "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
+    {"name": "Wyciskanie hantli na ławce", "muscle_group": "klatka", "sets": 3, "reps": "10-12",
+     "rest_between_sets": 90, "load": "2×12 kg hantle", "notes": "tempo wolne na zejściu"}
   ]
 }""",
         ]

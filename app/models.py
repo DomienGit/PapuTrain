@@ -100,6 +100,7 @@ class Exercise(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     workout_id: int = Field(foreign_key="workouts.id", index=True)
     name: str
+    muscle_group: str = ""  # krótka partia od AI, np. "klatka" (req 22)
     sets: int = 1
     reps: str = ""  # np. "8-12" albo "40 s" — SUGESTIA AI (placeholder w UI)
     rest_between_sets_s: int | None = None

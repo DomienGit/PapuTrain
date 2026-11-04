@@ -54,6 +54,7 @@ class AiExercise(SQLModel):
     """Ćwiczenie w odpowiedzi AI — walidacja zanim dane trafią do bazy."""
 
     name: str = Field(min_length=1, max_length=150)
+    muscle_group: str = Field(default="", max_length=50)  # np. "klatka", "nogi"
     sets: int = Field(ge=1, le=20)
     reps: str = Field(min_length=1, max_length=100)
     rest_between_sets: int = Field(ge=0, le=600)  # sekundy

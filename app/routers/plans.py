@@ -54,6 +54,7 @@ def _plan_to_dict(session, plan: Plan) -> dict:
                     {
                         "id": ex.id,
                         "name": ex.name,
+                        "muscle_group": ex.muscle_group,
                         "sets": ex.sets,
                         "reps": ex.reps,
                         "rest_between_sets_s": ex.rest_between_sets_s,
@@ -169,6 +170,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
                 Exercise(
                     workout_id=workout.id,
                     name=exercise_data.name,
+                    muscle_group=exercise_data.muscle_group,
                     sets=exercise_data.sets,
                     reps=exercise_data.reps,
                     rest_between_sets_s=exercise_data.rest_between_sets,
@@ -366,6 +368,7 @@ def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: Sessi
             Exercise(
                 workout_id=workout.id,
                 name=exercise_data.name,
+                muscle_group=exercise_data.muscle_group,
                 sets=exercise_data.sets,
                 reps=exercise_data.reps,
                 rest_between_sets_s=exercise_data.rest_between_sets,

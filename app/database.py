@@ -56,6 +56,7 @@ def _migrate() -> None:
     _add_column("plans", "week_title", "TEXT NOT NULL DEFAULT ''")
     _add_column("plans", "coach_note", "TEXT NOT NULL DEFAULT ''")
     _add_column("exercises", "performed", "TEXT NOT NULL DEFAULT ''")  # req 21: "zrobiłem"
+    _add_column("exercises", "muscle_group", "TEXT NOT NULL DEFAULT ''")  # req 22: partia
 
 
 def _add_column(table: str, column: str, definition: str) -> None:

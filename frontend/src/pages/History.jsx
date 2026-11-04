@@ -104,7 +104,12 @@ function ArchivedPlanDetail({ plan, onBack }) {
               {workout.exercises.map((ex) => (
                 <li key={ex.id} className="py-2">
                   <div className="flex justify-between gap-2">
-                    <span className="text-zinc-900">{ex.name}</span>
+                    <span className="text-zinc-900">
+                      {ex.name}
+                      {ex.muscle_group && (
+                        <span className="text-zinc-400"> ({ex.muscle_group})</span>
+                      )}
+                    </span>
                     <span className="shrink-0 text-sm text-zinc-500">
                       {ex.sets} × {ex.reps}
                       {ex.load && ` · ${ex.load}`}
