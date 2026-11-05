@@ -1,0 +1,91 @@
+# Deploy na VPS po każdym pushu na main ( oraz ręcznie z zakładki Actions ).
+#
+# To samo, co robiliśmy ręcznie: rsync kodu (bez .env, bazy i katalogów
+# buildowych) na root@VPS:/opt/paputrain + przebudowa kontenerów.
+# Uwierzytelnienie: dedykowany klucz SSH (secrets.DEPLOY_SSH_KEY),
+# którego publiczna część leży w authorized_keys na VPS.
+#
+# Sekrety (Settings → Secrets and variables → Actions):
+#   DEPLOY_SSH_KEY — prywatny klucz ed25519 (cały plik)
+#   DEPLOY_HOST    — adres VPS, np. 82.165.71.51
+
+name: Deploy na VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # pozwala odpalić deploy ręcznie z zakładki Actions
+
+permissions:
+  contents: read
+
+# Jeden deploy naraz — nowy push czeka w kolejce zamiast gryźć się
+# z trwającą przebudową kontenerów.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Przygotuj klucz SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pobieramy odcisk palca serwera (known_hosts) — bez niego
+          # ssh odmówi połączenia z nieznanym hostem.
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync kodu na VPS
+        run: |
+          rsync -avz \
+            --exclude='.git' \
+            --exclude='.venv' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='/data' \
+            --exclude='frontend/dist' \
+            --exclude='frontend/scripts' \
+            --exclude='SECURITY_FIXES.md' \
+            --exclude='app.db' \
+            --exclude='__pycache__' \
+            ./ "root@${{ secrets.DEPLOY_HOST }}:/opt/paputrain" \
+            | tee /tmp/rsync.log
+
+      - name: Przebuduj i uruchom kontenery
+        run: >
+          ssh "root@${{ secrets.DEPLOY_HOST }}"
+          "cd /opt/paputrain && docker compose up -d --build"
+
+      # Pułapka deployu (2026-11-04): Caddyfile jest bind-mountem pojedynczego
+      # pliku — rsync podmienia inode, więc działający kontener caddy dalej
+      # widzi STARY plik. compose nie odtworzy kontenera (definicja bez zmian),
+      # dlatego przy każdej zmianie Caddyfile trzeba go zrestartować.
+      - name: Restart Caddy (tylko gdy Caddyfile się zmienił)
+        run: |
+          if grep -q 'Caddyfile' /tmp/rsync.log; then
+            ssh "root@${{ secrets.DEPLOY_HOST }}" \
+              "cd /opt/paputrain && docker compose restart caddy"
+          else
+            echo "Caddyfile bez zmian — bez restartu"
+          fi
+
+      - name: Smoke test — backend odpowiada
+        run: |
+          # /api/auth/me bez tokenu zwraca 401 — to DOBRY wynik: backend żyje.
+          # Czekamy do 30 s na wstanie kontenera po przebudowie.
+          code=000
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              https://paputrain.duckdns.org/api/auth/me || true)
+            echo "próba $i: HTTP $code"
+            { [ "$code" = "401" ] || [ "$code" = "200" ]; } && break
+            sleep 5
+          done
+          { [ "$code" = "401" ] || [ "$code" = "200" ]; } \
+            || { echo "Backend nie odpowiada po deploju (HTTP $code)"; exit 1; }
