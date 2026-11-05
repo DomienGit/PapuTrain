@@ -43,7 +43,9 @@ jobs:
 
       - name: Rsync kodu na VPS
         run: |
-          rsync -avz \
+          # --chown=root:root — rsync z flagą -a przenosi uid z runera GitHuba
+          # (1001); wymuszamy właściciela jak przy dotychczasowych deployach.
+          rsync -avz --chown=root:root \
             --exclude='.git' \
             --exclude='.venv' \
             --exclude='node_modules' \
