@@ -374,7 +374,10 @@ def generate_plan(prompt: str) -> dict:
                         # Twardy limit długości odpowiedzi — patologicznie długi
                         # output nie zje darmowego limitu tokenów, zanim walidacja
                         # ją odrzuci (review 2026-11-04, pkt 8).
-                        max_output_tokens=4096,
+                        # UWAGA: modele "thinking" liczą rozumowanie do tego samego
+                        # budżetu — przy 4096 plan z polskimi opisami bywał ucinany
+                        # w połowie JSON-a (finish_reason=MAX_TOKENS, fix 2026-11-05).
+                        max_output_tokens=16384,
                     ),
                 )
             except (genai_errors.ClientError, genai_errors.ServerError) as err:
@@ -420,9 +423,34 @@ def generate_plan(prompt: str) -> dict:
             text = (response.text or "").strip()
             if not text:
                 raise AiError("Gemini zwrócił pustą odpowiedź — spróbuj ponownie")
+
+            finish_reason = (
+                response.candidates[0].finish_reason if response.candidates else None
+            )
+            if finish_reason == types.FinishReason.MAX_TOKENS:
+                # Odpowiedź ucięta w połowie = na pewno niepoprawny JSON.
+                # Nie próbujemy parsować ani ponawiać tego modelu — to problem
+                # budżetu tokenów, nie chwilowa awaria.
+                usage = response.usage_metadata
+                logger.warning(
+                    "Gemini: %s uciał odpowiedź limitem max_output_tokens "
+                    "(output=%s tokenów) — JSON niekompletny",
+                    model,
+                    usage.candidates_token_count if usage else "?",
+                )
+                raise AiError(
+                    "Odpowiedź Gemini została ucięta limitem długości — spróbuj ponownie"
+                )
+
             try:
                 result = json.loads(text)
             except json.JSONDecodeError as err:
+                logger.warning(
+                    "Gemini: %s zwrócił niepoprawny JSON (finish_reason=%s, %d znaków)",
+                    model,
+                    finish_reason,
+                    len(text),
+                )
                 raise AiError("Gemini zwrócił odpowiedź, która nie jest poprawnym JSON-em") from err
             if attempt > 1:
                 logger.info("Gemini: model %s odpowiedział dopiero przy próbie %d (łącznie %.1f s)", model, attempt, elapsed)

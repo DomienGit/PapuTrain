@@ -161,7 +161,7 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 - **Etap 7 — progresja i trening na żywo:** odhaczanie treningów (z datą wykonania), oceny wykonania 1-5 w planie, uwagi do ćwiczeń, przerwy między seriami/ćwiczeniami widoczne w planie (jako informacja), zakładka "Ćwiczenia" z ocenami preferencji 1-5 w katalogu, blokada przycisku "Generuj następny tydzień" do czasu odhaczenia wszystkich treningów, generowanie z uwzględnieniem całej historii, zakładka "Stoper" (start/stop/reset) + pływający pasek stopera widoczny cały czas podczas treningu.
 - **Etap 8 — historia:** lista archiwalnych planów + widok szczegółów.
 - **Etap 9 — PWA:** manifest + ikony + instalacja na telefon.
-- **Etap 10 — deploy na VPS:** Dockerfile dla backendu i frontendu, docker-compose, Caddy jako reverse proxy (brama przekazująca ruch z portu 443 do aplikacji) z automatycznym HTTPS. Nazwa pod certyfikat: darmowa subdomena DuckDNS (np. paputrain.duckdns.org) wskazująca na IP VPS-a.
+- **Etap 10 — deploy na VPS:** Dockerfile dla backendu i frontendu, docker-compose, Caddy jako reverse proxy (brama przekazująca ruch z portu 443 do aplikacji) z automatycznym HTTPS. Nazwa pod certyfikat: darmowa subdomena DuckDNS (np. paputrain.duckdns.org) wskazująca na IP VPS-a. Od 2026-11-05 deploy jest automatyczny: GitHub Actions (`.github/workflows/deploy.yml`) po pushu na `main` robi rsync na VPS + przebudowę kontenerów + smoke test API; uwierzytelnienie dedykowanym kluczem SSH (sekrety `DEPLOY_SSH_KEY`, `DEPLOY_HOST`).
 - **Etap 11 — preferencje partii mięśniowych (req 23):** pole muscle_preferences
   w profilu (JSON, automatyczna migracja), gwiazdki 1-5 przy partiach w onboardingu
   (krok 1) i w nowej podzakładce "Profil"; priorytet partii w obu promptach AI
