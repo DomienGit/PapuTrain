@@ -62,6 +62,11 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
    poziom, treningów/tydzień, czas, waga, wzrost, ograniczenia) plus preferencje partii
    (req 23). Dostępny zawsze; zapis = PUT /api/profile. Formularz współdzielony z
    onboardingu (jeden komponent).
+26. Nawigacja główna — TRZY zakładki (2026-11-10): **Trening** (aktywny plan, szkic,
+   generowanie), **Stoper**, **Profil**. Zakładka Profil ma cztery pod-zakładki:
+   Sprzęt, Ćwiczenia, Parametry (d. "Profil" — pełny formularz, req 25) i Historia
+   (archiwalne plany, wcześniej osobna zakładka). Panel "Obciążenie" zostaje przy
+   Sprzęcie.
 
 ## Stack technologii
 
@@ -122,10 +127,13 @@ priorytet). Każde nowe ćwiczenie użyte w planie serwer zapisuje do katalogu z
 
 ## Ekrany aplikacji (React)
 
+Nawigacja główna (req 26, 2026-11-10): trzy zakładki na dole ekranu — **Trening**,
+**Stoper**, **Profil**.
+
 1. **Logowanie** — login + hasło.
 2. **Onboarding (tylko przy pierwszym uruchomieniu, gdy nie ma profilu ani aktywnego planu)** — kreator trzech kroków: profil (parametry ciała + preferencje partii, req 23) → sprzęt (lista "posiadam" + dopisywanie własnego + panel "Obciążenie") → ćwiczenia (sugestie możliwe do wykonania z mojego sprzętu, odhaczam te, które mi pasują — krok opcjonalny, można pominąć). Po zakończeniu kreator się nie pokazuje.
-3. **Sprzęt i ćwiczenia** — dostępna zawsze z menu, trzy zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie"), **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI") i **Profil** (pełny edytor profilu: parametry ciała + preferencje partii 1-5, req 23 i 25). Oceny z katalogu i preferencje partii są brane pod uwagę przy generowaniu planów.
-4. **Aktywny plan (ekran główny)** — numerowane treningi jako sekcje ("Trening 1", "Trening 2"...), bez dni kalendarzowych; przy odhaczonym treningu widać datę wykonania; każde ćwiczenie:
+3. **Profil** — dostępna zawsze z menu, cztery pod-zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie"), **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI"), **Parametry** (pełny edytor profilu: parametry ciała + preferencje partii 1-5, req 23 i 25) i **Historia** (lista archiwalnych planów + pełny widok, ekran 7). Oceny z katalogu i preferencje partii są brane pod uwagę przy generowaniu planów.
+4. **Trening (ekran główny, zakładka "Trening")** — numerowane treningi jako sekcje ("Trening 1", "Trening 2"...), bez dni kalendarzowych; przy odhaczonym treningu widać datę wykonania; każde ćwiczenie:
    ćwiczenie jako ROZWIJANA KARTA (req 21): zwinięte — numer, nazwa z partią mięśniową w nawiasie (req 22), serie x powtórzenia, kg od AI, przerwa; rozwinięte po kliknięciu — ocena 1-5 (gwiazdki), pole kg (faktycznie użyte), pole "zrobiłem" (faktyczne serie×powtórzenia, placeholder = sugestia AI), notatka AI tylko do czytania;
    na dole treningu: checkbox "trening zrobiony"; na dole ekranu: przycisk "Generuj następny tydzień" (nieaktywny, dopóki nie odhaczę wszystkich treningów);
    podczas aktywnego treningu na dole ekranu PŁYWAJĄCY PASEK ze stoperem — widoczny cały czas na każdym ekranie aplikacji (klik otwiera pełny stoper).
@@ -133,7 +141,7 @@ priorytet). Każde nowe ćwiczenie użyte w planie serwer zapisuje do katalogu z
 6. **Draft / panel zatwierdzania** — pokazuje wygenerowany plan z oznaczeniem "szkic";
    akcje: zatwierdź, edytuj ręcznie, dla każdego treningu przycisk "poproś AI o zmianę" (pole tekstowe),
    odrzuć i wygeneruj od nowa.
-7. **Historia** — lista archiwalnych planów, kliknięcie pokazuje pełny plan.
+7. **Historia** — lista archiwalnych planów, kliknięcie pokazuje pełny plan. Od req 26 nie ma własnej zakładki — podzakładka w ekranie "Profil" (ekran 3).
 
 ## Przepływ generowania kolejnego tygodnia
 
@@ -174,6 +182,10 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 - **Etap 13 — edycja profilu po onboardingu (req 25):** wspólny komponent formularza
   profilu (ProfileForm) używany w onboardingu (krok 1) i w podzakładce "Profil"
   (pełna edycja parametrów ciała + preferencje partii, dostępna zawsze).
+- **Etap 14 — nowa nawigacja (req 26):** trzy zakładki główne — Trening, Stoper,
+  Profil; Profil = pod-zakładki Sprzęt, Ćwiczenia, Parametry, Historia (przeniesiona
+  z osobnej zakładki). Plus fix: gwiazdki (Stars) z type="button", bo klik w gwiazdkę
+  w formularzu profilu wysyłał formularz (przedwczesne przejście kroku onboardingu).
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 

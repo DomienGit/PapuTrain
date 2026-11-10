@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 
 /**
- * Zakładka "Historia" (Etap 8, PLAN.md ekran 7): lista archiwalnych planów,
- * kliknięcie pokazuje pełny plan — tylko do wglądu, bez akcji.
+ * Podzakładka "Historia" w zakładce "Profil" (Etap 8, PLAN.md ekran 7, req 26):
+ * lista archiwalnych planów, kliknięcie pokazuje pełny plan — tylko do wglądu,
+ * bez akcji. Bez własnej ramki/nagłówka — dostarcza je strona nadrzędna.
  */
 export default function History() {
   const [plans, setPlans] = useState(null)
@@ -26,11 +27,9 @@ export default function History() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="text-xl font-bold text-zinc-900">Historia</h1>
-
+    <div>
       {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
 
       {openPlan ? (

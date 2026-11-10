@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { api, getToken } from './api'
 import StopWatch, { formatTime } from './components/Stopwatch'
 import EquipmentExercises from './pages/EquipmentExercises'
-import History from './pages/History'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
@@ -15,7 +14,7 @@ export default function App() {
   const [username, setUsername] = useState(null)
   const [checking, setChecking] = useState(Boolean(getToken()))
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
-  const [tab, setTab] = useState('home') // 'home' | 'equipment' | 'stoper' | 'historia'
+  const [tab, setTab] = useState('trening') // 'trening' | 'stoper' | 'profil' (req 26)
 
   // Stoper (Etap 7): baseMs = zebrany czas z poprzednich "kolejek",
   // startedAt = moment ostatniego startu. Wyświetlany czas to suma.
@@ -87,9 +86,8 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-zinc-100 pb-20">
-      {tab === 'home' && <Home username={username} />}
-      {tab === 'equipment' && <EquipmentExercises />}
-      {tab === 'historia' && <History />}
+      {tab === 'trening' && <Home username={username} />}
+      {tab === 'profil' && <EquipmentExercises />}
       {tab === 'stoper' && (
         <StopWatch
           elapsedMs={elapsedMs}
@@ -114,14 +112,9 @@ export default function App() {
       )}
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-zinc-200 bg-white">
-        <NavItem active={tab === 'home'} label="Główny" onClick={() => setTab('home')} />
-        <NavItem
-          active={tab === 'equipment'}
-          label="Sprzęt"
-          onClick={() => setTab('equipment')}
-        />
+        <NavItem active={tab === 'trening'} label="Trening" onClick={() => setTab('trening')} />
         <NavItem active={tab === 'stoper'} label="Stoper" onClick={() => setTab('stoper')} />
-        <NavItem active={tab === 'historia'} label="Historia" onClick={() => setTab('historia')} />
+        <NavItem active={tab === 'profil'} label="Profil" onClick={() => setTab('profil')} />
       </nav>
     </div>
   )

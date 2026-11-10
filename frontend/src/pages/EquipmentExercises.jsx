@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import EquipmentList from '../components/EquipmentList'
 import ExerciseList from '../components/ExerciseList'
+import History from './History'
 import ProfileForm from '../components/ProfileForm'
 
 /**
- * Zakładka "Sprzęt i ćwiczenia" (PLAN.md: ekran 3). Dostępna zawsze,
- * także gdy plan jest aktywny. Trzy pod-zakładki: Sprzęt, Ćwiczenia, Profil.
+ * Zakładka "Profil" (PLAN.md: ekran 3, req 26). Dostępna zawsze, także gdy
+ * plan jest aktywny. Cztery pod-zakładki: Sprzęt, Ćwiczenia, Parametry, Historia.
  */
 export default function EquipmentExercises() {
-  const [subTab, setSubTab] = useState('equipment') // 'equipment' | 'exercises' | 'profile'
+  const [subTab, setSubTab] = useState('equipment')
+  // 'equipment' | 'exercises' | 'profile' | 'history'
   const [ownedNames, setOwnedNames] = useState(new Set())
-  // Podzakładka "Profil" (req 25): profil z API dla formularza edycji.
+  // Podzakładka "Parametry" (req 25): profil z API dla formularza edycji.
   const [profile, setProfile] = useState(null) // null = jeszcze ładuję
   const [error, setError] = useState('')
 
@@ -24,7 +26,7 @@ export default function EquipmentExercises() {
       .catch(() => {})
   }, [subTab])
 
-  // Podzakładka Profil: ładujemy profil przy każdym wejściu (dane mogły się zmienić).
+  // Podzakładka Parametry: ładujemy profil przy każdym wejściu (dane mogły się zmienić).
   useEffect(() => {
     if (subTab !== 'profile') return
     setError('')
@@ -34,13 +36,13 @@ export default function EquipmentExercises() {
   }, [subTab])
 
   const tabClass = (active) =>
-    `flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+    `flex-1 rounded-lg py-2 text-center text-xs font-medium transition-colors ${
       active ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
     }`
 
   return (
     <div className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-xl font-bold text-zinc-900">Sprzęt i ćwiczenia</h1>
+      <h1 className="mb-4 text-xl font-bold text-zinc-900">Profil</h1>
 
       <div className="mb-5 flex gap-1 rounded-xl bg-white p-1 shadow-sm">
         <button className={tabClass(subTab === 'equipment')} onClick={() => setSubTab('equipment')}>
@@ -50,13 +52,18 @@ export default function EquipmentExercises() {
           Ćwiczenia
         </button>
         <button className={tabClass(subTab === 'profile')} onClick={() => setSubTab('profile')}>
-          Profil
+          Parametry
+        </button>
+        <button className={tabClass(subTab === 'history')} onClick={() => setSubTab('history')}>
+          Historia
         </button>
       </div>
 
       {subTab === 'equipment' && <EquipmentList allowAdd />}
 
       {subTab === 'exercises' && <ExerciseList ownedNames={ownedNames} allowAdd />}
+
+      {subTab === 'history' && <History />}
 
       {subTab === 'profile' && (
         <div>
