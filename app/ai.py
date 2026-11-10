@@ -16,6 +16,7 @@ from google.genai import types
 
 from app.config import settings
 from app.models import CatalogExercise, Equipment, Exercise, Profile, Workout
+from app.schemas import MUSCLE_GROUPS
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,28 @@ def _catalog_lines(catalog: list[CatalogExercise]) -> list[str]:
     return lines
 
 
+# Zasada skali ocen partii (req 23) — wklejana do prompta, gdy są ocenione partie.
+MUSCLE_PRIORITY_RULE = (
+    "PRIORYTET PARTII wg moich ocen: 1 = NIE używaj tej partii wcale; "
+    "2 = maksymalnie JEDNO ćwiczenie na tę partię w CAŁYM tygodniu; "
+    "3 lub brak oceny = bez specjalnych wytycznych; 4-5 = większość objętości "
+    "(liczba ćwiczeń i serii), przy czym 5 = najmocniejszy priorytet."
+)
+
+
+def _muscle_section(profile: Profile) -> list[str]:
+    """Sekcja prompta z ocenami partii (req 23). Pusta, gdy brak ocen —
+    wtedy sekcja w ogóle nie powstaje (zachowanie jak przed req 23)."""
+    lines = [
+        f"- {group}: {profile.muscle_preferences[group]}/5"
+        for group in MUSCLE_GROUPS
+        if profile.muscle_preferences.get(group) is not None
+    ]
+    if not lines:
+        return []
+    return ["", "PRIORYTETOWE PARTIE MIĘŚNIOWE (moje oceny 1-5):", *lines]
+
+
 def _history_lines(history: list[tuple[Workout, list[Exercise]]]) -> list[str]:
     """Zrzuca poprzedni plan z wykonaniami, ocenami i uwagami do prompta."""
     lines = []
@@ -122,6 +145,9 @@ def build_generation_prompt(
     if profile.limitations:
         body.append(f"- ograniczenia zdrowotne: {profile.limitations}")
 
+    muscle_section = _muscle_section(profile)
+    body.extend(muscle_section)
+
     body.append("")
     body.append("DOSTĘPNY SPRZĘT:")
     eq_lines = _equipment_lines(equipment)
@@ -144,30 +170,33 @@ def build_generation_prompt(
         body.extend(_history_lines(history))
 
     rules = [
-        f"1. Wygeneruj DOKŁADNIE {profile.workouts_per_week} treningów ponumerowanych "
+        f"Wygeneruj DOKŁADNIE {profile.workouts_per_week} treningów ponumerowanych "
         '"Trening 1", "Trening 2" itd. — BEZ przypisywania do dni tygodnia.',
-        "2. Używaj WYŁĄCZNIE ćwiczeń wykonalnych bez sprzętu, z domowymi zamiennikami "
-        "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
-        "pełnego dostępu do siłowni.",
-        "3. Każdy trening powinien dać się wykonać w podanym czasie.",
-        "4. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach). "
+        "PRIORYTET SPRZĘTU: jeśli podano sprzęt, zdecydowaną większość ćwiczeń wybieraj "
+        "NA TYM SPRZĘCIE. Ćwiczenia bez sprzętu (masa ciała, domowe zamienniki: "
+        f"{HOME_SUBSTITUTES}) dodawaj TYLKO jako uzupełnienie — gdy pula sensownych "
+        "ćwiczeń na sprzęcie w danej partii mięśniowej się wyczerpie. Żadnych maszyn ani "
+        "sztang olimpijskich, jeśli nie ma pełnego dostępu do siłowni.",
+        "Każdy trening powinien dać się wykonać w podanym czasie.",
+        "ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach). "
         "Progresja może polegać także na skróceniu przerw (ćwiczenia za łatwe) "
         "lub ich wydłużeniu (za trudne).",
-        "5. Ćwiczenia ocenione 4-5/5 preferuj, ocenione 1-2/5 pomiń. Ćwiczenia wybrane "
+        "Ćwiczenia ocenione 4-5/5 preferuj, ocenione 1-2/5 pomiń. Ćwiczenia wybrane "
         "traktuj jako preferencje — resztę dobierz tak, żeby plan był sensowny całościowo.",
-        "6. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
-        f"7. Tytuł tygodnia: \"Tydzień {week_number}\".",
-        "8. Wszystkie teksty (nazwy treningów, uwagi, notatka trenera) po polsku.",
-        "9. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
+        "Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+        f"Tytuł tygodnia: \"Tydzień {week_number}\".",
+        "Wszystkie teksty (nazwy treningów, uwagi, notatka trenera) po polsku.",
+        "ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
         "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\", \"2×10 kg hantle\"); "
         "dla ćwiczeń z masą ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
-        "10. Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
-        "dobraną z tej listy: klatka, plecy, nogi, barki, biceps, triceps, brzuch, "
-        "pośladki, łydki, przedramiona, całe ciało.",
+        "Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
+        f"dobraną z tej listy: {', '.join(MUSCLE_GROUPS)}, całe ciało.",
     ]
+    if muscle_section:
+        rules.append(MUSCLE_PRIORITY_RULE)
     if history:
         rules.append(
-            "11. To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5), "
+            "To kolejny tydzień — pokazuję poprzedni plan z ocenami wykonania (1-5), "
             "uwagami i tym, co NAPRAWDĘ zrobiłem (\"zrobiłem\") w porównaniu z moją sugestią. "
             "To porównanie to moja realna wydajność: dobieraj kolejne serie, powtórzenia "
             "i obciążenia na jego bazie, nie tylko na ocenach. Oceny 4-5 i pełne wykonanie "
@@ -177,7 +206,8 @@ def build_generation_prompt(
         )
 
     body.extend(["", "TWARDE ZASADY:"])
-    body.extend(rules)
+    # Numeracja nadawana przy składaniu — lista zasad rośnie, ręczna renumeracja bywa błędna.
+    body.extend(f"{i}. {rule}" for i, rule in enumerate(rules, start=1))
     body.extend(
         [
             "",
@@ -212,6 +242,7 @@ def build_workout_revision_prompt(
 ) -> str:
     """Prompt "poproś AI o zmianę": AI przepisuje JEDEN trening, reszta planu zostaje."""
     gym = _has_gym(equipment)
+    muscle_section = _muscle_section(profile)
     body = [
         "Jesteś doświadczonym trenerem personalnym. Zmieniasz JEDEN trening w tygodniowym "
         "planie zgodnie z prośbą podopiecznego.",
@@ -224,6 +255,7 @@ def build_workout_revision_prompt(
     ]
     if profile.limitations:
         body.append(f"- ograniczenia zdrowotne: {profile.limitations}")
+    body.extend(muscle_section)
 
     body.append("")
     body.append("DOSTĘPNY SPRZĘT:")
@@ -268,26 +300,33 @@ def build_workout_revision_prompt(
     body.append("PROŚBA PODOPIECZNEGO:")
     body.append(user_request)
 
+    rules = [
+        "Zwróć DOKŁADNIE JEDEN trening (ten zmieniany) w strukturze JSON poniżej.",
+        "PRIORYTET SPRZĘTU: jeśli podano sprzęt, zdecydowaną większość ćwiczeń "
+        "wybieraj NA TYM SPRZĘCIE. Ćwiczenia bez sprzętu (masa ciała, domowe "
+        f"zamienniki: {HOME_SUBSTITUTES}) dodawaj TYLKO jako uzupełnienie — gdy pula "
+        "sensownych ćwiczeń na sprzęcie w danej partii mięśniowej się wyczerpie. "
+        "Żadnych maszyn ani sztang olimpijskich, jeśli nie ma pełnego dostępu "
+        "do siłowni.",
+        "ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach).",
+        "ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
+        "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\"); dla ćwiczeń z masą "
+        "ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
+        "Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
+        f"dobraną z tej listy: {', '.join(MUSCLE_GROUPS)}, całe ciało.",
+        "Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
+        "podopieczny. Nie musisz wymieniać wszystkiego.",
+        "Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
+        "Cały trening powinien dać się wykonać w podanym dziennym czasie.",
+        "Wszystkie teksty po polsku.",
+    ]
+    if muscle_section:
+        rules.append(MUSCLE_PRIORITY_RULE)
+
+    body.extend(["", "TWARDE ZASADY:"])
+    body.extend(f"{i}. {rule}" for i, rule in enumerate(rules, start=1))
     body.extend(
         [
-            "",
-            "TWARDE ZASADY:",
-            "1. Zwróć DOKŁADNIE JEDEN trening (ten zmieniany) w strukturze JSON poniżej.",
-            "2. Używaj WYŁĄCZNIE ćwiczeń wykonalnych bez sprzętu, z domowymi zamiennikami "
-            "lub z podanego sprzętu. Żadnych maszyn ani sztang olimpijskich, jeśli nie ma "
-            "pełnego dostępu do siłowni.",
-            "3. ZAWSZE podawaj przerwy między seriami i między ćwiczeniami (w sekundach).",
-            "4. ZAWSZE podawaj obciążenie (load) dla każdego ćwiczenia: w kilogramach "
-            "dla ćwiczeń z obciążeniem zewnętrznym (np. \"40 kg\"); dla ćwiczeń z masą "
-            "ciała wpisz wariant, np. \"masa ciała\" albo \"na kolanach\".",
-            "5. Przy KAŻDYM ćwiczeniu podaj muscle_group — krótką partię mięśniową "
-            "dobraną z tej listy: klatka, plecy, nogi, barki, biceps, triceps, brzuch, "
-            "pośladki, łydki, przedramiona, całe ciało.",
-            "6. Możesz zostawić dobre ćwiczenia z obecnej wersji — zmieniaj to, o co prosi "
-            "podopieczny. Nie musisz wymieniać wszystkiego.",
-            "7. Respektuj ograniczenia zdrowotne — nie proponuj ćwiczeń, które mogą szkodzić.",
-            "8. Cały trening powinien dać się wykonać w podanym dziennym czasie.",
-            "9. Wszystkie teksty po polsku.",
             "",
             "ODPOWIEDŹ: zwróć WYŁĄCZNIE poprawny JSON (bez komentarzy i markdown) "
             "dokładnie w tej strukturze:",

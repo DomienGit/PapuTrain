@@ -46,6 +46,13 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
 20. Stoper podczas aktywnego treningu: włączam go RAZ na początku treningu i leci cały czas, bez żadnych przycisków do naciskania przy ćwiczeniach czy seriah — zero klikania w trakcie. Czas cały czas przed oczami: pływający pasek na dole ekranu (widoczny na każdej zakładce) + osobna zakładka "Stoper" z dużym zegarem (start/stop/reset). Przerwy z planu są tylko INFORMACJĄ tekstową ("przerwa 90 s") — sam czytam czas ze stopera, żadnych timerów odliczających i dźwięków.
 21. Ćwiczenie w aktywnym planie to KARTA ROZWIJANA (2026-11-04): zwinięta pokazuje TYLKO co do zrobienia — numer ćwiczenia, nazwa z partią mięśniową w nawiasie, serie × powtórzenia, kilogramy sugerowane przez AI, przerwa. Klik w ćwiczenie ROZWIJA panel: ocena wykonania 1-5 (gwiazdki), pole "zrobiłem" (faktyczne serie×powtórzenia, placeholder = sugestia AI, np. "3×12" gdy AI dało "3×10"), pole kg (faktycznie użyte; AI ZAWSZE proponuje obciążenie w kg przy generowaniu — pole load; dla masę ciała np. "masa ciała"; plany wygenerowane PRZED tą funkcją mają puste kg — uzupełniam ręcznie) i notatka AI (tylko do czytania). Wszystko z panelu idzie do AI przy generowaniu kolejnego tygodnia: AI porównuje sugestię z faktem i na tej bazie dokładniej dobiera progresję. Kilogramy wypisują się też w szkicu i historii.
 22. Partia mięśniowa przy nazwie ćwiczenia (2026-11-04): AI przy każdym ćwiczeniu podaje krótką partię (klatka, nogi, plecy, barki, biceps, triceps, brzuch, pośladki, łydki itd.), wyświetlaną w nawiasie przy nazwie — w aktywnym planie, szkicu i historii.
+23. Preferencje partii mięśniowych (2026-11-10): w onboardingu (krok 1) i w podzakładce
+   "Profil" (zakładka "Sprzęt i ćwiczenia") lista najważniejszych partii (klatka, plecy,
+   nogi, barki, biceps, triceps, brzuch, pośladki, łydki, przedramiona) z oceną 1-5
+   gwiazdkami. Znaczenie skali: 1 = POMIŃ partię, 2 = ewentualnie maks. 1 ćwiczenie
+   na tę partię w CAŁYM tygodniu, 3 = neutralnie (jak brak oceny), 4 = mocny nacisk,
+   5 = najmocniejszy priorytet. Nieocenione partie = neutralne. Oceny trafiają do AI
+   przy generowaniu planu i przy "poproś AI o zmianę".
 
 ## Stack technologii
 
@@ -61,7 +68,9 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
 
 ## Struktura danych (tabele w bazie)
 
-- **profile** — jeden rekord: cel, poziom, treningi_w_tygodniu, czas_treningu_min, waga, wzrost, ograniczenia.
+- **profile** — jeden rekord: cel, poziom, treningi_w_tygodniu, czas_treningu_min, waga,
+  wzrost, ograniczenia, preferencje_partii (JSON: {"klatka": 5, ...} — tylko ocenione
+  partie, req 23).
 - **equipment** — nazwa, typ (predefiniowany / własny), czy_posiadany (bool), szczegóły
   (opcjonalny tekst, np. "4×2,5 kg + 2×10 kg" dla pozycji "Obciążenie"). Pozycja
   "Siłownia" rozpoznawana po nazwie: jej posiadanie = pełny dostęp do sprzętu.
@@ -94,13 +103,19 @@ Czasy przerw podawane w sekundach.
 
 Serwer waliduje JSON (pydantic) i zapisuje jako draft. AI nigdy nie pisze bezpośrednio do bazy jako "aktywny" — zawsze przez draft + zatwierdzenie.
 
-AI komponuje plan z ćwiczeń odhaczonych w katalogu (czy_wybrane — traktuje je jako preferencje) oraz może DODAWAĆ WŁASNE sugestie, ale tylko ćwiczenia wykonalne w moich warunkach: bez sprzętu (masa własnego ciała), z domowym sprzętem zastępczym (stół, krzesło, ściana, podłoga) lub z posiadanego sprzętu. Żadnych ćwiczeń wymagających sprzętu, którego nie mam (maszyny, siłownia, sztanga olimpijska itd.). Preferuje ćwiczenia z wysoką oceną w katalogu, pomija ocenione nisko. Każde nowe ćwiczenie użyte w planie serwer zapisuje do katalogu ze źródłem "AI".
+AI komponuje plan z ćwiczeń odhaczonych w katalogu (czy_wybrane — traktuje je jako preferencje) oraz może DODAWAĆ WŁASNE sugestie, ale tylko ćwiczenia wykonalne w moich warunkach: bez sprzętu (masa własnego ciała), z domowym sprzętem zastępczym (stół, krzesło, ściana, podłoga) lub z posiadanego sprzętu. PRIORYTET POSIADANEGO SPRZĘTU: zdecydowana większość ćwiczeń
+planu ma wykorzystywać posiadany sprzęt; warianty bez sprzętu (masa ciała, domowe
+zamienniki) to tylko uzupełnienie — gdy pula ćwiczeń na sprzęcie w danej partii mięśniowej
+się wyczerpie. Żadnych ćwiczeń wymagających sprzętu, którego nie mam (maszyny, siłownia, sztanga olimpijska itd.). Preferuje ćwiczenia z wysoką oceną w katalogu, pomija ocenione nisko. Jeśli podano
+preferencje partii (req 23): ocena 1 = pomiń partię, 2 = maks. jedno ćwiczenie na tę
+partię w całym tygodniu, 3 = neutralnie, 4-5 = większość objętości planu (5 = najmocniejszy
+priorytet). Każde nowe ćwiczenie użyte w planie serwer zapisuje do katalogu ze źródłem "AI".
 
 ## Ekrany aplikacji (React)
 
 1. **Logowanie** — login + hasło.
-2. **Onboarding (tylko przy pierwszym uruchomieniu, gdy nie ma profilu ani aktywnego planu)** — kreator trzech kroków: profil (parametry ciała) → sprzęt (lista "posiadam" + dopisywanie własnego + panel "Obciążenie") → ćwiczenia (sugestie możliwe do wykonania z mojego sprzętu, odhaczam te, które mi pasują — krok opcjonalny, można pominąć). Po zakończeniu kreator się nie pokazuje.
-3. **Sprzęt i ćwiczenia** — dostępna zawsze z menu, dwie zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie") i **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI"). Oceny z katalogu są brane pod uwagę przy generowaniu planów.
+2. **Onboarding (tylko przy pierwszym uruchomieniu, gdy nie ma profilu ani aktywnego planu)** — kreator trzech kroków: profil (parametry ciała + preferencje partii, req 23) → sprzęt (lista "posiadam" + dopisywanie własnego + panel "Obciążenie") → ćwiczenia (sugestie możliwe do wykonania z mojego sprzętu, odhaczam te, które mi pasują — krok opcjonalny, można pominąć). Po zakończeniu kreator się nie pokazuje.
+3. **Sprzęt i ćwiczenia** — dostępna zawsze z menu, trzy zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie"), **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI") i **Profil** (preferencje partii mięśniowych 1-5, req 23). Oceny z katalogu i preferencje partii są brane pod uwagę przy generowaniu planów.
 4. **Aktywny plan (ekran główny)** — numerowane treningi jako sekcje ("Trening 1", "Trening 2"...), bez dni kalendarzowych; przy odhaczonym treningu widać datę wykonania; każde ćwiczenie:
    ćwiczenie jako ROZWIJANA KARTA (req 21): zwinięte — numer, nazwa z partią mięśniową w nawiasie (req 22), serie x powtórzenia, kg od AI, przerwa; rozwinięte po kliknięciu — ocena 1-5 (gwiazdki), pole kg (faktycznie użyte), pole "zrobiłem" (faktyczne serie×powtórzenia, placeholder = sugestia AI), notatka AI tylko do czytania;
    na dole treningu: checkbox "trening zrobiony"; na dole ekranu: przycisk "Generuj następny tydzień" (nieaktywny, dopóki nie odhaczę wszystkich treningów);
@@ -115,7 +130,7 @@ AI komponuje plan z ćwiczeń odhaczonych w katalogu (czy_wybrane — traktuje j
 
 1. Warunek startowy: wszystkie treningi aktualnego planu odhaczone jako wykonane. Jeśli nie — przycisk "Generuj następny tydzień" jest nieaktywny z podpowiedzią "odhacz wszystkie treningi".
 2. Klikam "Generuj następny tydzień".
-3. Backend zbiera: profil + sprzęt (posiadany) + katalog ćwiczeń z ocenami 1-5 i zaznaczeniami "pasuje" + ostatni aktywny plan + oceny wykonania 1-5 + uwagi + odhaczone treningi (z datami wykonania — AI widzi realny rytm) + FAKTYCZNIE wykonane serie×powtórzenia i obciążenia (pole "zrobiłem" i load — AI porównuje je z własnymi sugestiami i kalibruje progresję).
+3. Backend zbiera: profil (z preferencjami partii, req 23) + sprzęt (posiadany) + katalog ćwiczeń z ocenami 1-5 i zaznaczeniami "pasuje" + ostatni aktywny plan + oceny wykonania 1-5 + uwagi + odhaczone treningi (z datami wykonania — AI widzi realny rytm) + FAKTYCZNIE wykonane serie×powtórzenia i obciążenia (pole "zrobiłem" i load — AI porównuje je z własnymi sugestiami i kalibruje progresję).
 4. Buduje prompt (instrukcję dla AI) i wysyła do Gemini. Twarde zasady w instrukcji: (a) używać WYŁĄCZNIE ćwiczeń bez sprzętu, z domowymi zamiennikami (stół, krzesło, ściana, podłoga) lub z posiadanego sprzętu; (b) NIE przypisywać treningów do dni kalendarzowych — N treningów ponumerowanych do wykonania w dowolne dni tygodnia; (c) zawsze podawać przerwy między seriami i między ćwiczeniami; progresja może polegać także na skróceniu/wydłużeniu przerw (krótsze przerwy gdy ćwiczenia łatwe, dłuższe gdy trudne).
 5. Gemini zwraca JSON → walidacja → zapis jako draft → nowe ćwiczenia (nieznane w katalogu) dopisują się do katalogu ze źródłem "AI".
 6. Ja oglądam draft, ewentualnie edytuję / proszę AI o poprawki.
@@ -138,6 +153,11 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
 - **Etap 8 — historia:** lista archiwalnych planów + widok szczegółów.
 - **Etap 9 — PWA:** manifest + ikony + instalacja na telefon.
 - **Etap 10 — deploy na VPS:** Dockerfile dla backendu i frontendu, docker-compose, Caddy jako reverse proxy (brama przekazująca ruch z portu 443 do aplikacji) z automatycznym HTTPS. Nazwa pod certyfikat: darmowa subdomena DuckDNS (np. paputrain.duckdns.org) wskazująca na IP VPS-a.
+- **Etap 11 — preferencje partii mięśniowych (req 23):** pole muscle_preferences
+  w profilu (JSON, automatyczna migracja), gwiazdki 1-5 przy partiach w onboardingu
+  (krok 1) i w nowej podzakładce "Profil"; priorytet partii w obu promptach AI
+  (generowanie + zmiana treningu). Skala: 1 = pomiń, 2 = maks. 1 ćwiczenie/tydzień,
+  3 = neutralnie, 4-5 = większość objętości.
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 

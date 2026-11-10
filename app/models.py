@@ -33,6 +33,12 @@ class Profile(SQLModel, table=True):
     weight_kg: float | None = None
     height_cm: float | None = None
     limitations: str = ""  # ograniczenia zdrowotne (puste = brak)
+    # Preferencje partii mięśniowych (req 23): {"klatka": 5, "nogi": 2} — TYLKO
+    # ocenione partie. Skala: 1 = pomiń, 2 = maks. 1 ćwiczenie/tydzień,
+    # 3 = neutralnie, 4-5 = priorytet (5 najmocniejszy).
+    muscle_preferences: dict[str, int] = Field(
+        default_factory=dict, sa_column=Column(JSON)
+    )
 
 
 class Equipment(SQLModel, table=True):

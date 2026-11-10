@@ -6,10 +6,26 @@ tu np. zakresy (ocena 1-5), zanim dane dotkną bazy.
 
 from typing import Annotated
 
+from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 # Krótki string (np. nazwa sprzętu na liście) — limit długości elementów list.
 ShortStr = Annotated[str, Field(max_length=100)]
+
+# Partie mięśniowe do preferencji profilu (req 23). Jedno źródło listy dla
+# walidacji API i promptów AI (bez "całe ciało" — to nie jest cel priorytetu).
+MUSCLE_GROUPS = [
+    "klatka",
+    "plecy",
+    "nogi",
+    "barki",
+    "biceps",
+    "triceps",
+    "brzuch",
+    "pośladki",
+    "łydki",
+    "przedramiona",
+]
 
 
 class ProfileUpsert(SQLModel):
@@ -20,6 +36,17 @@ class ProfileUpsert(SQLModel):
     weight_kg: float | None = Field(default=None, gt=0, lt=400)
     height_cm: float | None = Field(default=None, gt=0, lt=260)
     limitations: str = Field(default="", max_length=2000)
+    # Oceny 1-5 per partia; tylko ocenione partie (brak klucza = neutralnie).
+    # max_length na dykcie = limit liczby kluczy (review 2026-11-04 wzorzec).
+    muscle_preferences: dict[ShortStr, Annotated[int, Field(ge=1, le=5)]] = Field(
+        default_factory=dict, max_length=12
+    )
+
+    @field_validator("muscle_preferences")
+    @classmethod
+    def only_known_groups(cls, value: dict[str, int]) -> dict[str, int]:
+        """Zostawia tylko partie z MUSCLE_GROUPS — nieznane klucze wycina."""
+        return {group: rating for group, rating in value.items() if group in MUSCLE_GROUPS}
 
 
 class EquipmentCreate(SQLModel):

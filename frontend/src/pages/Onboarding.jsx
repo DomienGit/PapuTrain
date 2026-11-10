@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import EquipmentList from '../components/EquipmentList'
 import ExerciseList from '../components/ExerciseList'
+import MusclePreferences from '../components/MusclePreferences'
 
 const LEVELS = ['początkujący', 'średni', 'zaawansowany']
 
@@ -99,6 +100,7 @@ export default function Onboarding({ onDone }) {
 function ProfileStep({ onSaved }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [musclePrefs, setMusclePrefs] = useState({}) // req 23: {partia: 1-5}, tylko ocenione
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -117,6 +119,7 @@ function ProfileStep({ onSaved }) {
           weight_kg: value('weight_kg') ? Number(value('weight_kg')) : null,
           height_cm: value('height_cm') ? Number(value('height_cm')) : null,
           limitations: value('limitations'),
+          muscle_preferences: musclePrefs,
         }),
       })
       onSaved()
@@ -224,6 +227,17 @@ function ProfileStep({ onSaved }) {
           placeholder="np. ból dolnego odcinka pleców przy skłonach"
           className={inputClass}
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-zinc-700">
+          Na jakich partiach chcesz się skupić? (opcjonalnie)
+        </label>
+        <p className="mb-2 text-xs text-zinc-500">
+          1 = pomiń partię, 2 = maks. jedno ćwiczenie w tygodniu, 4-5 = priorytet
+          (5 najmocniejszy). Bez oceny = neutralnie.
+        </p>
+        <MusclePreferences value={musclePrefs} onChange={setMusclePrefs} />
       </div>
 
       <button
