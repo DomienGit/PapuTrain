@@ -53,6 +53,10 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
    na tę partię w CAŁYM tygodniu, 3 = neutralnie (jak brak oceny), 4 = mocny nacisk,
    5 = najmocniejszy priorytet. Nieocenione partie = neutralne. Oceny trafiają do AI
    przy generowaniu planu i przy "poproś AI o zmianę".
+24. Pamięć gwiazdek wykonania (2026-11-10): katalog zapamiętuje OSTATNIĄ ocenę wykonania
+   (1-5) każdego ćwiczenia. Gdy ćwiczenie o tej samej nazwie pojawi się w kolejnym planie
+   (nowy tydzień albo trening przepisany przez AI), gwiazdki są od razu wstępnie zaznaczone
+   tą wartością — i można je w każdym tygodniu zmienić (zmiana nadpisuje pamięć).
 
 ## Stack technologii
 
@@ -74,7 +78,7 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
 - **equipment** — nazwa, typ (predefiniowany / własny), czy_posiadany (bool), szczegóły
   (opcjonalny tekst, np. "4×2,5 kg + 2×10 kg" dla pozycji "Obciążenie"). Pozycja
   "Siłownia" rozpoznawana po nazwie: jej posiadanie = pełny dostęp do sprzętu.
-- **exercise_catalog** — nazwa_ćwiczenia, potrzebny_sprzęt (lista nazw sprzętu), czy_wybrane (zaznaczone przeze mnie jako "pasuje"), moja_ocena (1-5, null = nieocenione), źródło (wbudowane / AI / własne). Wbudowany katalog (ok. 80-100 ćwiczeń z przypisanym sprzętem) generuje raz Gemini na etapie budowy aplikacji i trafia do pliku JSON w kodzie. Ćwiczenia zasugerowane przez AI w planach ZAPISUJĄ SIĘ AUTOMATYCZNIE do katalogu (źródło: AI) — katalog rośnie z każdym tygodniem i jest wysyłany do AI przy kolejnych generowaniach, żeby AI nie wymyślał nazw od zera (mniejszy koszt zapytań, spójna nazwa ćwiczenia).
+- **exercise_catalog** — nazwa_ćwiczenia, potrzebny_sprzęt (lista nazw sprzętu), czy_wybrane (zaznaczone przeze mnie jako "pasuje"), moja_ocena (1-5, null = nieocenione), ostatnia_ocena_wykonania (1-5, null — pamięć gwiazdek wykonania, req 24), źródło (wbudowane / AI / własne). Wbudowany katalog (ok. 80-100 ćwiczeń z przypisanym sprzętem) generuje raz Gemini na etapie budowy aplikacji i trafia do pliku JSON w kodzie. Ćwiczenia zasugerowane przez AI w planach ZAPISUJĄ SIĘ AUTOMATYCZNIE do katalogu (źródło: AI) — katalog rośnie z każdym tygodniem i jest wysyłany do AI przy kolejnych generowaniach, żeby AI nie wymyślał nazw od zera (mniejszy koszt zapytań, spójna nazwa ćwiczenia).
 - **plans** — id, data_startu_tygdnia, status (draft / active / archived), numer_tygodnia, tytuł_tygodnia i notatka_trenera (z odpowiedzi AI), uwagi_od_użytkownika.
 - **workouts** (treningi w planie) — id, plan_id, numer_treningu (1, 2, 3...), nazwa_treningu (np. "Trening A — góra ciała"), przerwa_miedzy_cwiczeniami_s (sekundy, opcjonalna), czy_zrobiony (bool), data_wykonania (opcjonalna). Brak pola "dzień tygodnia" — trening wykonywany w dowolnym dniu.
 - **exercises** — id, workout_id, nazwa, partia_mięśniowa (krótka, od AI, np. "klatka"), serie, powtórzenia, przerwa_miedzy_seriami_s (sekundy), obciążenie/opis (AI proponuje w kg), zrobione_serie×powtórzenia (faktycznie wykonane — wpisuję w aktywnym planie; sugestia AI zostaje w serie/powtórzenia jako placeholder), ocena (1-5, null = brak — to ocena WYKONANIA w danym tygodniu, nie mylić z oceną preferencji w exercise_catalog), uwaga (tekst, od AI — tylko do czytania w aktywnym planie).
@@ -158,6 +162,10 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
   (krok 1) i w nowej podzakładce "Profil"; priorytet partii w obu promptach AI
   (generowanie + zmiana treningu). Skala: 1 = pomiń, 2 = maks. 1 ćwiczenie/tydzień,
   3 = neutralnie, 4-5 = większość objętości.
+- **Etap 12 — pamięć gwiazdek wykonania (req 24):** exercise_catalog.last_rating
+  (ostatnia ocena 1-5 per ćwiczenie, automatyczna migracja); zapis oceny aktualizuje
+  katalog; nowe ćwiczenia od AI dostają wstępnie zaznaczone gwiazdki z pamięci
+  (frontend bez zmian — gwiazdki czytają exercise.rating).
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 

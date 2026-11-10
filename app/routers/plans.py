@@ -20,6 +20,7 @@ from app.ai import (
 from app.database import SessionDep
 from app.models import CatalogExercise, Equipment, Exercise, Plan, Profile, Workout
 from app.schemas import (
+    AiExercise,
     AiPlan,
     AiWorkout,
     AskAiRequest,
@@ -99,6 +100,29 @@ def _register_ai_exercises(session, workouts: list[AiWorkout]) -> None:
                 existing.add(exercise.name.casefold())
 
 
+def _ratings_from_catalog(catalog: list[CatalogExercise]) -> dict[str, int | None]:
+    """Pamięć gwiazdek (req 24): nazwa -> ostatnia ocena wykonania."""
+    return {ex.name.casefold(): ex.last_rating for ex in catalog}
+
+
+def _exercise_from_ai(
+    workout_id: int, data: AiExercise, ratings: dict[str, int | None]
+) -> Exercise:
+    """Ćwiczenie z odpowiedzi AI. Gdy nazwa jest w pamięci katalogu, gwiazdki
+    wykonania startują od razu zaznaczone (req 24); nieznana nazwa = brak oceny."""
+    return Exercise(
+        workout_id=workout_id,
+        name=data.name,
+        muscle_group=data.muscle_group,
+        sets=data.sets,
+        reps=data.reps,
+        rest_between_sets_s=data.rest_between_sets,
+        load=data.load,
+        note=data.notes,
+        rating=ratings.get(data.name.casefold()),
+    )
+
+
 @router.post("/generate")
 def generate_plan_endpoint(session: SessionDep) -> dict:
     active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
@@ -156,6 +180,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
     session.add(plan)
     session.flush()  # flush = zapis do bazy bez kończenia transakcji; potrzebne, by mieć plan.id
 
+    ratings = _ratings_from_catalog(catalog)
     for number, workout_data in enumerate(plan_data.workouts, start=1):
         workout = Workout(
             plan_id=plan.id,
@@ -166,18 +191,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
         session.add(workout)
         session.flush()
         for exercise_data in workout_data.exercises:
-            session.add(
-                Exercise(
-                    workout_id=workout.id,
-                    name=exercise_data.name,
-                    muscle_group=exercise_data.muscle_group,
-                    sets=exercise_data.sets,
-                    reps=exercise_data.reps,
-                    rest_between_sets_s=exercise_data.rest_between_sets,
-                    load=exercise_data.load,
-                    note=exercise_data.notes,
-                )
-            )
+            session.add(_exercise_from_ai(workout.id, exercise_data, ratings))
 
     _register_ai_exercises(session, plan_data.workouts)
     session.commit()
@@ -363,19 +377,9 @@ def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: Sessi
     workout.rest_between_exercises_s = workout_data.rest_between_exercises
     session.add(workout)
     session.flush()
+    ratings = _ratings_from_catalog(catalog)
     for exercise_data in workout_data.exercises:
-        session.add(
-            Exercise(
-                workout_id=workout.id,
-                name=exercise_data.name,
-                muscle_group=exercise_data.muscle_group,
-                sets=exercise_data.sets,
-                reps=exercise_data.reps,
-                rest_between_sets_s=exercise_data.rest_between_sets,
-                load=exercise_data.load,
-                note=exercise_data.notes,
-            )
-        )
+        session.add(_exercise_from_ai(workout.id, exercise_data, ratings))
     _register_ai_exercises(session, [workout_data])
     session.commit()
     return _plan_to_dict(session, draft)
@@ -422,6 +426,19 @@ def set_exercise_feedback(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
     if data.rating is not None:
         exercise.rating = data.rating
+        # Pamięć gwiazdek (req 24): ostatnia ocena wróci jako pre-wypełniona,
+        # gdy AI znów da ćwiczenie o tej samej nazwie.
+        entry = next(
+            (
+                c
+                for c in session.exec(select(CatalogExercise)).all()
+                if c.name.casefold() == exercise.name.casefold()
+            ),
+            None,
+        )
+        if entry is not None:
+            entry.last_rating = data.rating
+            session.add(entry)
     if data.note is not None:
         exercise.note = data.note
     if data.performed is not None:

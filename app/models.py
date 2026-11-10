@@ -67,6 +67,7 @@ class CatalogExercise(SQLModel, table=True):
     required_equipment: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     chosen: bool = False  # "pasuje mi" — preferencja, nie zamknięta pula
     preference_rating: int | None = None
+    last_rating: int | None = None  # ostatnia ocena WYKONANIA (req 24) — pamięć gwiazdek
     source: str = "builtin"
 
 

@@ -58,6 +58,7 @@ def _migrate() -> None:
     _add_column("exercises", "performed", "TEXT NOT NULL DEFAULT ''")  # req 21: "zrobiłem"
     _add_column("exercises", "muscle_group", "TEXT NOT NULL DEFAULT ''")  # req 22: partia
     _add_column("profile", "muscle_preferences", "TEXT NOT NULL DEFAULT '{}'")  # req 23
+    _add_column("exercise_catalog", "last_rating", "INTEGER")  # req 24: pamięć gwiazdek
 
 
 def _add_column(table: str, column: str, definition: str) -> None:
