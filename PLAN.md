@@ -57,6 +57,11 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
    (1-5) każdego ćwiczenia. Gdy ćwiczenie o tej samej nazwie pojawi się w kolejnym planie
    (nowy tydzień albo trening przepisany przez AI), gwiazdki są od razu wstępnie zaznaczone
    tą wartością — i można je w każdym tygodniu zmienić (zmiana nadpisuje pamięć).
+25. Edycja profilu po onboardingu (2026-11-10): podzakładka "Profil" (zakładka "Sprzęt
+   i ćwiczenia") zawiera PEŁNY formularz profilu — te same pola co onboarding (cel,
+   poziom, treningów/tydzień, czas, waga, wzrost, ograniczenia) plus preferencje partii
+   (req 23). Dostępny zawsze; zapis = PUT /api/profile. Formularz współdzielony z
+   onboardingu (jeden komponent).
 
 ## Stack technologii
 
@@ -119,7 +124,7 @@ priorytet). Każde nowe ćwiczenie użyte w planie serwer zapisuje do katalogu z
 
 1. **Logowanie** — login + hasło.
 2. **Onboarding (tylko przy pierwszym uruchomieniu, gdy nie ma profilu ani aktywnego planu)** — kreator trzech kroków: profil (parametry ciała + preferencje partii, req 23) → sprzęt (lista "posiadam" + dopisywanie własnego + panel "Obciążenie") → ćwiczenia (sugestie możliwe do wykonania z mojego sprzętu, odhaczam te, które mi pasują — krok opcjonalny, można pominąć). Po zakończeniu kreator się nie pokazuje.
-3. **Sprzęt i ćwiczenia** — dostępna zawsze z menu, trzy zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie"), **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI") i **Profil** (preferencje partii mięśniowych 1-5, req 23). Oceny z katalogu i preferencje partii są brane pod uwagę przy generowaniu planów.
+3. **Sprzęt i ćwiczenia** — dostępna zawsze z menu, trzy zakładki: **Sprzęt** (lista "posiadam" + dopisywanie własnego + panel "Obciążenie"), **Ćwiczenia** (katalog: oceniam ćwiczenia 1-5, zaznaczam "pasuje / nie pasuje", dopisuję własne; ćwiczenia zasugerowane przez AI mają etykietę "od AI") i **Profil** (pełny edytor profilu: parametry ciała + preferencje partii 1-5, req 23 i 25). Oceny z katalogu i preferencje partii są brane pod uwagę przy generowaniu planów.
 4. **Aktywny plan (ekran główny)** — numerowane treningi jako sekcje ("Trening 1", "Trening 2"...), bez dni kalendarzowych; przy odhaczonym treningu widać datę wykonania; każde ćwiczenie:
    ćwiczenie jako ROZWIJANA KARTA (req 21): zwinięte — numer, nazwa z partią mięśniową w nawiasie (req 22), serie x powtórzenia, kg od AI, przerwa; rozwinięte po kliknięciu — ocena 1-5 (gwiazdki), pole kg (faktycznie użyte), pole "zrobiłem" (faktyczne serie×powtórzenia, placeholder = sugestia AI), notatka AI tylko do czytania;
    na dole treningu: checkbox "trening zrobiony"; na dole ekranu: przycisk "Generuj następny tydzień" (nieaktywny, dopóki nie odhaczę wszystkich treningów);
@@ -166,6 +171,9 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
   (ostatnia ocena 1-5 per ćwiczenie, automatyczna migracja); zapis oceny aktualizuje
   katalog; nowe ćwiczenia od AI dostają wstępnie zaznaczone gwiazdki z pamięci
   (frontend bez zmian — gwiazdki czytają exercise.rating).
+- **Etap 13 — edycja profilu po onboardingu (req 25):** wspólny komponent formularza
+  profilu (ProfileForm) używany w onboardingu (krok 1) i w podzakładce "Profil"
+  (pełna edycja parametrów ciała + preferencje partii, dostępna zawsze).
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 
