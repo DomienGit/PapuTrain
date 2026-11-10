@@ -1,6 +1,8 @@
 """Plany tygodnia: generowanie przez AI (Etap 5) i odczyt szkicu/aktywnego planu.
 
-Panel edycji i zatwierdzania szkicu powstanie w Etapie 6 — tu tylko dane.
+Panel edycji i zatwierdzania szkicu powstał w Etapie 6 — tu tylko dane.
+Od req 27 wszystkie dane są per konto: każdy select na planach/profilu/
+sprzęcie/katalogu filtruje po id zalogowanego użytkownika.
 Zasady (PLAN.md): szkic zawsze maksymalnie jeden (nowy nadpisuje stary),
 generowanie zablokowane, dopóki aktywny plan ma nieodhaczone treningi.
 """
@@ -17,8 +19,17 @@ from app.ai import (
     build_workout_revision_prompt,
     generate_plan,
 )
+from app.auth import CurrentUserObj
 from app.database import SessionDep
-from app.models import CatalogExercise, Equipment, Exercise, Plan, Profile, Workout
+from app.models import (
+    CatalogExercise,
+    Equipment,
+    Exercise,
+    Plan,
+    Profile,
+    User,
+    Workout,
+)
 from app.schemas import (
     AiExercise,
     AiPlan,
@@ -88,14 +99,21 @@ def _delete_plan(session, plan: Plan) -> None:
     session.delete(plan)
 
 
-def _register_ai_exercises(session, workouts: list[AiWorkout]) -> None:
-    """Nowe nazwy ćwiczeń od AI dopisuje do katalogu ze źródłem "ai" (PLAN.md)."""
-    existing = {ex.name.casefold() for ex in session.exec(select(CatalogExercise)).all()}
+def _register_ai_exercises(session, user: User, workouts: list[AiWorkout]) -> None:
+    """Nowe nazwy ćwiczeń od AI dopisuje do KATALOGU UŻYTKOWNIKA ze źródłem "ai" (PLAN.md)."""
+    existing = {
+        ex.name.casefold()
+        for ex in session.exec(
+            select(CatalogExercise).where(CatalogExercise.user_id == user.id)
+        ).all()
+    }
     for workout in workouts:
         for exercise in workout.exercises:
             if exercise.name.casefold() not in existing:
                 session.add(
-                    CatalogExercise(name=exercise.name, required_equipment=[], source="ai")
+                    CatalogExercise(
+                        user_id=user.id, name=exercise.name, required_equipment=[], source="ai"
+                    )
                 )
                 existing.add(exercise.name.casefold())
 
@@ -124,8 +142,10 @@ def _exercise_from_ai(
 
 
 @router.post("/generate")
-def generate_plan_endpoint(session: SessionDep) -> dict:
-    active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
+def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
+    active = session.exec(
+        select(Plan).where(Plan.status == "active", Plan.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
     if active is not None:
         undone = [
             w
@@ -138,7 +158,7 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
                 "Odhacz wszystkie treningi aktywnego planu przed wygenerowaniem kolejnego",
             )
 
-    profile = session.exec(select(Profile)).first()
+    profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()  # type: ignore[arg-type]
     if profile is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Najpierw uzupełnij profil w kreatorze")
 
@@ -150,9 +170,24 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
         ).all()
         history = [(w, _workout_exercises(session, w)) for w in workouts]
 
-    equipment = list(session.exec(select(Equipment).where(Equipment.owned)).all())  # type: ignore[arg-type]
-    catalog = list(session.exec(select(CatalogExercise)).all())
-    week_number = max((p.week_number for p in session.exec(select(Plan)).all()), default=0) + 1
+    equipment = list(
+        session.exec(
+            select(Equipment).where(Equipment.owned, Equipment.user_id == user.id)  # type: ignore[arg-type]
+        ).all()
+    )
+    catalog = list(
+        session.exec(select(CatalogExercise).where(CatalogExercise.user_id == user.id)).all()  # type: ignore[arg-type]
+    )
+    week_number = (
+        max(
+            (
+                p.week_number
+                for p in session.exec(select(Plan).where(Plan.user_id == user.id)).all()  # type: ignore[arg-type]
+            ),
+            default=0,
+        )
+        + 1
+    )
 
     prompt = build_generation_prompt(profile, equipment, catalog, week_number, history)
     try:
@@ -167,12 +202,15 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
         )
 
     # Szkic zawsze jeden: stary draft leci do kosza.
-    old_draft = session.exec(select(Plan).where(Plan.status == "draft")).first()  # type: ignore[arg-type]
+    old_draft = session.exec(
+        select(Plan).where(Plan.status == "draft", Plan.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
     if old_draft is not None:
         _delete_plan(session, old_draft)
 
     plan = Plan(
         status="draft",
+        user_id=user.id,
         week_number=week_number,
         week_title=plan_data.week_title,
         coach_note=plan_data.coach_note,
@@ -193,32 +231,30 @@ def generate_plan_endpoint(session: SessionDep) -> dict:
         for exercise_data in workout_data.exercises:
             session.add(_exercise_from_ai(workout.id, exercise_data, ratings))
 
-    _register_ai_exercises(session, plan_data.workouts)
+    _register_ai_exercises(session, user, plan_data.workouts)
     session.commit()
     return _plan_to_dict(session, plan)
 
 
 @router.get("/draft")
-def get_draft(session: SessionDep) -> dict:
-    draft = session.exec(select(Plan).where(Plan.status == "draft")).first()  # type: ignore[arg-type]
-    if draft is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak szkicu planu")
+def get_draft(user: CurrentUserObj, session: SessionDep) -> dict:
+    draft = _get_draft_or_404(session, user)
     return _plan_to_dict(session, draft)
 
 
 @router.get("/active")
-def get_active(session: SessionDep) -> dict:
-    active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
-    if active is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak aktywnego planu")
+def get_active(user: CurrentUserObj, session: SessionDep) -> dict:
+    active = _get_active_or_404(session, user)
     return _plan_to_dict(session, active)
 
 
 @router.get("/archived")
-def list_archived(session: SessionDep) -> list[dict]:
+def list_archived(user: CurrentUserObj, session: SessionDep) -> list[dict]:
     """Lista archiwalnych planów (Etap 8) — skrót, bez ćwiczeń; pełny plan osobno."""
     plans = session.exec(
-        select(Plan).where(Plan.status == "archived").order_by(Plan.week_number)  # type: ignore[arg-type]
+        select(Plan)
+        .where(Plan.status == "archived", Plan.user_id == user.id)  # type: ignore[arg-type]
+        .order_by(Plan.week_number)  # type: ignore[arg-type]
     ).all()
     result = []
     for plan in plans:
@@ -238,9 +274,9 @@ def list_archived(session: SessionDep) -> list[dict]:
 
 
 @router.get("/archived/{plan_id}")
-def get_archived(plan_id: int, session: SessionDep) -> dict:
+def get_archived(plan_id: int, user: CurrentUserObj, session: SessionDep) -> dict:
     plan = session.get(Plan, plan_id)
-    if plan is None or plan.status != "archived":
+    if plan is None or plan.status != "archived" or plan.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego archiwalnego planu")
     return _plan_to_dict(session, plan)
 
@@ -249,19 +285,21 @@ def get_archived(plan_id: int, session: SessionDep) -> dict:
 
 # Edycja szkicu pozwala uporządkować plan PRZED zatwierdzeniem; aktywny plan
 # dostaje własne akcje (odhaczanie, oceny) w Etapie 7.
-def _get_draft_or_404(session) -> Plan:
-    draft = session.exec(select(Plan).where(Plan.status == "draft")).first()  # type: ignore[arg-type]
+def _get_draft_or_404(session, user: User) -> Plan:
+    draft = session.exec(
+        select(Plan).where(Plan.status == "draft", Plan.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
     if draft is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak szkicu planu")
     return draft
 
 
-def _get_draft_workout_or_404(session, workout_id: int) -> Workout:
+def _get_draft_workout_or_404(session, user: User, workout_id: int) -> Workout:
     """Trening szkicu o podanym id (404, gdy nie istnieje lub należy do innego planu)."""
     workout = session.get(Workout, workout_id)
     if workout is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego treningu w szkicu")
-    if workout.plan_id != _get_draft_or_404(session).id:
+    if workout.plan_id != _get_draft_or_404(session, user).id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten trening nie należy do szkicu")
     return workout
 
@@ -273,10 +311,12 @@ def _workout_exercises(session, workout: Workout) -> list[Exercise]:
 
 
 @router.post("/draft/approve")
-def approve_draft(session: SessionDep) -> dict:
+def approve_draft(user: CurrentUserObj, session: SessionDep) -> dict:
     """Szkic staje się planem aktywnym; dotychczasowy aktywny przechodzi do archiwum."""
-    draft = _get_draft_or_404(session)
-    old_active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
+    draft = _get_draft_or_404(session, user)
+    old_active = session.exec(
+        select(Plan).where(Plan.status == "active", Plan.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
     if old_active is not None:
         old_active.status = "archived"
         session.add(old_active)
@@ -288,18 +328,20 @@ def approve_draft(session: SessionDep) -> dict:
 
 
 @router.delete("/draft")
-def reject_draft(session: SessionDep) -> dict:
+def reject_draft(user: CurrentUserObj, session: SessionDep) -> dict:
     """Odrzucenie szkicu — użytkownik może od razu wygenerować plan od nowa."""
-    draft = _get_draft_or_404(session)
+    draft = _get_draft_or_404(session, user)
     _delete_plan(session, draft)
     session.commit()
     return {"deleted": True}
 
 
 @router.patch("/draft/workouts/{workout_id}")
-def update_workout(workout_id: int, data: WorkoutUpdate, session: SessionDep) -> dict:
+def update_workout(
+    workout_id: int, data: WorkoutUpdate, user: CurrentUserObj, session: SessionDep
+) -> dict:
     """Ręczna zmiana treningu w szkicu: nazwa, przerwa między ćwiczeniami."""
-    workout = _get_draft_workout_or_404(session, workout_id)
+    workout = _get_draft_workout_or_404(session, user, workout_id)
     if data.name is not None:
         workout.name = data.name
     if data.rest_between_exercises_s is not None:
@@ -311,10 +353,14 @@ def update_workout(workout_id: int, data: WorkoutUpdate, session: SessionDep) ->
 
 @router.patch("/draft/workouts/{workout_id}/exercises/{exercise_id}")
 def update_exercise(
-    workout_id: int, exercise_id: int, data: ExerciseUpdate, session: SessionDep
+    workout_id: int,
+    exercise_id: int,
+    data: ExerciseUpdate,
+    user: CurrentUserObj,
+    session: SessionDep,
 ) -> dict:
     """Ręczna zmiana ćwiczenia w szkicu: nazwa, serie, powtórzenia, przerwy, uwagi."""
-    workout = _get_draft_workout_or_404(session, workout_id)  # pilnuje, że to trening szkicu
+    workout = _get_draft_workout_or_404(session, user, workout_id)  # pilnuje, że to trening szkicu
     exercise = session.get(Exercise, exercise_id)
     if exercise is None or exercise.workout_id != workout_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
@@ -328,9 +374,11 @@ def update_exercise(
 
 
 @router.delete("/draft/workouts/{workout_id}/exercises/{exercise_id}")
-def delete_exercise(workout_id: int, exercise_id: int, session: SessionDep) -> dict:
+def delete_exercise(
+    workout_id: int, exercise_id: int, user: CurrentUserObj, session: SessionDep
+) -> dict:
     """Usunięcie ćwiczenia ze szkicu."""
-    workout = _get_draft_workout_or_404(session, workout_id)
+    workout = _get_draft_workout_or_404(session, user, workout_id)
     exercise = session.get(Exercise, exercise_id)
     if exercise is None or exercise.workout_id != workout_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
@@ -340,16 +388,24 @@ def delete_exercise(workout_id: int, exercise_id: int, session: SessionDep) -> d
 
 
 @router.post("/draft/workouts/{workout_id}/ask-ai")
-def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: SessionDep) -> dict:
+def ask_ai_to_revise_workout(
+    workout_id: int, body: AskAiRequest, user: CurrentUserObj, session: SessionDep
+) -> dict:
     """"Poproś AI o zmianę": AI przepisuje jeden trening wg tekstowej prośby."""
-    workout = _get_draft_workout_or_404(session, workout_id)
+    workout = _get_draft_workout_or_404(session, user, workout_id)
     draft = session.get(Plan, workout.plan_id)
 
-    profile = session.exec(select(Profile)).first()
+    profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()  # type: ignore[arg-type]
     if profile is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Najpierw uzupełnij profil w kreatorze")
-    equipment = list(session.exec(select(Equipment).where(Equipment.owned)).all())  # type: ignore[arg-type]
-    catalog = list(session.exec(select(CatalogExercise)).all())
+    equipment = list(
+        session.exec(
+            select(Equipment).where(Equipment.owned, Equipment.user_id == user.id)  # type: ignore[arg-type]
+        ).all()
+    )
+    catalog = list(
+        session.exec(select(CatalogExercise).where(CatalogExercise.user_id == user.id)).all()  # type: ignore[arg-type]
+    )
 
     all_workouts = session.exec(
         select(Workout).where(Workout.plan_id == draft.id).order_by(Workout.number)  # type: ignore[arg-type]
@@ -380,34 +436,38 @@ def ask_ai_to_revise_workout(workout_id: int, body: AskAiRequest, session: Sessi
     ratings = _ratings_from_catalog(catalog)
     for exercise_data in workout_data.exercises:
         session.add(_exercise_from_ai(workout.id, exercise_data, ratings))
-    _register_ai_exercises(session, [workout_data])
+    _register_ai_exercises(session, user, [workout_data])
     session.commit()
     return _plan_to_dict(session, draft)
 
 
 # --- Etap 7: trening na żywo (odhaczanie, oceny wykonania, uwagi) ---
 
-def _get_active_or_404(session) -> Plan:
-    active = session.exec(select(Plan).where(Plan.status == "active")).first()  # type: ignore[arg-type]
+def _get_active_or_404(session, user: User) -> Plan:
+    active = session.exec(
+        select(Plan).where(Plan.status == "active", Plan.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
     if active is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak aktywnego planu")
     return active
 
 
-def _get_active_workout_or_404(session, workout_id: int) -> Workout:
+def _get_active_workout_or_404(session, user: User, workout_id: int) -> Workout:
     """Trening aktywnego planu o podanym id (404, gdy nie istnieje lub cudzy plan)."""
     workout = session.get(Workout, workout_id)
     if workout is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego treningu")
-    if workout.plan_id != _get_active_or_404(session).id:
+    if workout.plan_id != _get_active_or_404(session, user).id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ten trening nie należy do aktywnego planu")
     return workout
 
 
 @router.patch("/active/workouts/{workout_id}")
-def set_workout_done(workout_id: int, data: WorkoutDoneUpdate, session: SessionDep) -> dict:
+def set_workout_done(
+    workout_id: int, data: WorkoutDoneUpdate, user: CurrentUserObj, session: SessionDep
+) -> dict:
     """Odhaczenie treningu. Data wykonania = dziś (AI widzi realny rytm — PLAN.md req 9)."""
-    workout = _get_active_workout_or_404(session, workout_id)
+    workout = _get_active_workout_or_404(session, user, workout_id)
     workout.done = data.done
     workout.completed_date = date.today() if data.done else None
     session.add(workout)
@@ -417,21 +477,27 @@ def set_workout_done(workout_id: int, data: WorkoutDoneUpdate, session: SessionD
 
 @router.patch("/active/workouts/{workout_id}/exercises/{exercise_id}")
 def set_exercise_feedback(
-    workout_id: int, exercise_id: int, data: ExerciseFeedbackUpdate, session: SessionDep
+    workout_id: int,
+    exercise_id: int,
+    data: ExerciseFeedbackUpdate,
+    user: CurrentUserObj,
+    session: SessionDep,
 ) -> dict:
     """Ocena wykonania (1-5), uwaga i "zrobiłem" — idą do AI przy kolejnym tygodniu."""
-    workout = _get_active_workout_or_404(session, workout_id)
+    workout = _get_active_workout_or_404(session, user, workout_id)
     exercise = session.get(Exercise, exercise_id)
     if exercise is None or exercise.workout_id != workout_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nie ma takiego ćwiczenia w tym treningu")
     if data.rating is not None:
         exercise.rating = data.rating
         # Pamięć gwiazdek (req 24): ostatnia ocena wróci jako pre-wypełniona,
-        # gdy AI znów da ćwiczenie o tej samej nazwie.
+        # gdy AI znów da ćwiczenie o tej samej nazwie. Zapis w KATALOGU UŻYTKOWNIKA.
         entry = next(
             (
                 c
-                for c in session.exec(select(CatalogExercise)).all()
+                for c in session.exec(
+                    select(CatalogExercise).where(CatalogExercise.user_id == user.id)
+                ).all()
                 if c.name.casefold() == exercise.name.casefold()
             ),
             None,

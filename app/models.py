@@ -11,21 +11,26 @@ from sqlmodel import Field, SQLModel
 
 
 class User(SQLModel, table=True):
-    """Jedno konto logowania — aplikacja jest jednoosobowa."""
+    """Konto logowania (req 27). Konta tworzy admin z CLI (app/create_user.py)."""
 
     __tablename__ = "users"
 
     id: int | None = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
-    password_hash: str  # hash bcrypt — czystego hasła NIGDY nie zapisujemy
+    # Hash bcrypt — czystego hasła NIGDY nie zapisujemy. "" = hasło jeszcze
+    # nieustawione: konto tworzone bez hasła, user ustawi je przy pierwszym
+    # logowaniu (POST /api/auth/set-password). "" nigdy nie przechodzi
+    # verify_password, więc takie konto nie wpuszcza nikogo przez zwykły login.
+    password_hash: str = ""
 
 
 class Profile(SQLModel, table=True):
-    """Jeden rekord — profil treningowy Dominika."""
+    """Profil treningowy użytkownika — jeden rekord na konto (req 27)."""
 
     __tablename__ = "profile"
 
     id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, index=True, foreign_key="users.id")
     goal: str  # cel, np. "siła", "redukcja tłuszczu"
     level: str  # poziom: "początkujący" / "średni" / "zaawansowany"
     workouts_per_week: int  # N treningów w tygodniu
@@ -42,12 +47,14 @@ class Profile(SQLModel, table=True):
 
 
 class Equipment(SQLModel, table=True):
-    """Sprzęt użytkownika. type: "predefined" (znany z katalogu) / "custom" (własny wpis)."""
+    """Sprzęt użytkownika (req 27: wiersze per konto — ta sama nazwa może być
+    u wielu kont). type: "predefined" (znany z katalogu) / "custom" (własny wpis)."""
 
     __tablename__ = "equipment"
 
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True)
+    user_id: int | None = Field(default=None, index=True, foreign_key="users.id")
+    name: str = Field(index=True)  # bez UNIQUE: różne konta mają swoje kopie
     type: str = "custom"
     owned: bool = False  # czy_posiadany
     details: str = ""  # np. "4×2,5 kg + 2×10 kg" (krążki dla "Obciążenie")
@@ -56,6 +63,9 @@ class Equipment(SQLModel, table=True):
 class CatalogExercise(SQLModel, table=True):
     """Katalog ćwiczeń (wbudowany + dopisywany przez AI i użytkownika).
 
+    Req 27: kopie per konto (oceny i preferencje są osobiste), więc nazwa NIE
+    jest UNIQUE w bazie — unikatowość pilnuje logika w obrębie konta.
+
     source: "builtin" / "ai" / "custom"
     preference_rating: ocena preferencji 1-5 (None = nieocenione).
     """
@@ -63,7 +73,8 @@ class CatalogExercise(SQLModel, table=True):
     __tablename__ = "exercise_catalog"
 
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True)
+    user_id: int | None = Field(default=None, index=True, foreign_key="users.id")
+    name: str = Field(index=True)
     required_equipment: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     chosen: bool = False  # "pasuje mi" — preferencja, nie zamknięta pula
     preference_rating: int | None = None
@@ -77,6 +88,7 @@ class Plan(SQLModel, table=True):
     __tablename__ = "plans"
 
     id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, index=True, foreign_key="users.id")  # req 27
     week_start_date: date | None = None
     status: str = Field(default="draft")
     week_number: int = 1

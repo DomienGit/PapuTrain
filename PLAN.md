@@ -67,6 +67,18 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
    Sprzęt, Ćwiczenia, Parametry (d. "Profil" — pełny formularz, req 25) i Historia
    (archiwalne plany, wcześniej osobna zakładka). Panel "Obciążenie" zostaje przy
    Sprzęcie.
+27. Konta wieloosobowe (2026-11-10): aplikacja obsługuje wiele kont z WŁASNYMI danymi
+   (profil, sprzęt, katalog ćwiczeń z ocenami, plany, historia — każdy widzi tylko swoje).
+   Bez ekranu rejestracji: konto tworzy admin z CLI na serwerze
+   (`python -m app.create_user <login>`), hasło może zostać puste. Konto bez hasła przy
+   pierwszym logowaniu dostaje ekran "ustaw hasło" (hasło + powtórzenie); po ustawieniu
+   user jest od razu zalogowany. Admin może też CLI-em zresetować komuś hasło.
+   Logowanie: 5 prób/min (ochrona przed zgadywaniem).
+26. Nawigacja główna — TRZY zakładki (2026-11-10): **Trening** (aktywny plan, szkic,
+   generowanie), **Stoper**, **Profil**. Zakładka Profil ma cztery pod-zakładki:
+   Sprzęt, Ćwiczenia, Parametry (d. "Profil" — pełny formularz, req 25) i Historia
+   (archiwalne plany, wcześniej osobna zakładka). Panel "Obciążenie" zostaje przy
+   Sprzęcie.
 
 ## Stack technologii
 
@@ -82,14 +94,25 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
 
 ## Struktura danych (tabele w bazie)
 
-- **profile** — jeden rekord: cel, poziom, treningi_w_tygodniu, czas_treningu_min, waga,
+Od req 27 każdy wiersz w tabelach danych należy do konta (`user_id` → users.id).
+Konta tworzy admin z CLI (`python -m app.create_user`); nowe konto dostaje od razu
+własną kopię predefiniowanego sprzętu i wbudowanego katalogu. W tabelach
+profile/equipment/exercise_catalog/plans wiersze są filtrowane po zalogowanym
+użytkowniku; workouts/exercises są osiągalne tylko przez plan.
+
+- **users** — login, hash hasła (bcrypt). `""` w hashu = hasło nieustawione: konto
+  tworzone bez hasła, użytkownik ustawia je przy pierwszym logowaniu (ekran
+  "ustaw hasło", req 27).
+- **profile** — jeden rekord PER KONTO: cel, poziom, treningi_w_tygodniu, czas_treningu_min, waga,
   wzrost, ograniczenia, preferencje_partii (JSON: {"klatka": 5, ...} — tylko ocenione
   partie, req 23).
-- **equipment** — nazwa, typ (predefiniowany / własny), czy_posiadany (bool), szczegóły
+- **equipment** — PER KONTO (kopie tej samej nazwy u różnych kont są dozwolone): nazwa,
+  typ (predefiniowany / własny), czy_posiadany (bool), szczegóły
   (opcjonalny tekst, np. "4×2,5 kg + 2×10 kg" dla pozycji "Obciążenie"). Pozycja
   "Siłownia" rozpoznawana po nazwie: jej posiadanie = pełny dostęp do sprzętu.
-- **exercise_catalog** — nazwa_ćwiczenia, potrzebny_sprzęt (lista nazw sprzętu), czy_wybrane (zaznaczone przeze mnie jako "pasuje"), moja_ocena (1-5, null = nieocenione), ostatnia_ocena_wykonania (1-5, null — pamięć gwiazdek wykonania, req 24), źródło (wbudowane / AI / własne). Wbudowany katalog (ok. 80-100 ćwiczeń z przypisanym sprzętem) generuje raz Gemini na etapie budowy aplikacji i trafia do pliku JSON w kodzie. Ćwiczenia zasugerowane przez AI w planach ZAPISUJĄ SIĘ AUTOMATYCZNIE do katalogu (źródło: AI) — katalog rośnie z każdym tygodniem i jest wysyłany do AI przy kolejnych generowaniach, żeby AI nie wymyślał nazw od zera (mniejszy koszt zapytań, spójna nazwa ćwiczenia).
-- **plans** — id, data_startu_tygdnia, status (draft / active / archived), numer_tygodnia, tytuł_tygodnia i notatka_trenera (z odpowiedzi AI), uwagi_od_użytkownika.
+- **exercise_catalog** — PER KONTO (kopie per konto, bo oceny i preferencje są osobiste):
+  nazwa_ćwiczenia, potrzebny_sprzęt (lista nazw sprzętu), czy_wybrane (zaznaczone przeze mnie jako "pasuje"), moja_ocena (1-5, null = nieocenione), ostatnia_ocena_wykonania (1-5, null — pamięć gwiazdek wykonania, req 24), źródło (wbudowane / AI / własne). Wbudowany katalog (ok. 80-100 ćwiczeń z przypisanym sprzętem) generuje raz Gemini na etapie budowy aplikacji i trafia do pliku JSON w kodzie. Ćwiczenia zasugerowane przez AI w planach ZAPISUJĄ SIĘ AUTOMATYCZNIE do katalogu (źródło: AI) — katalog rośnie z każdym tygodniem i jest wysyłany do AI przy kolejnych generowaniach, żeby AI nie wymyślał nazw od zera (mniejszy koszt zapytań, spójna nazwa ćwiczenia).
+- **plans** — id, user_id, data_startu_tygdnia, status (draft / active / archived), numer_tygodnia (per użytkownik), tytuł_tygodnia i notatka_trenera (z odpowiedzi AI), uwagi_od_użytkownika.
 - **workouts** (treningi w planie) — id, plan_id, numer_treningu (1, 2, 3...), nazwa_treningu (np. "Trening A — góra ciała"), przerwa_miedzy_cwiczeniami_s (sekundy, opcjonalna), czy_zrobiony (bool), data_wykonania (opcjonalna). Brak pola "dzień tygodnia" — trening wykonywany w dowolnym dniu.
 - **exercises** — id, workout_id, nazwa, partia_mięśniowa (krótka, od AI, np. "klatka"), serie, powtórzenia, przerwa_miedzy_seriami_s (sekundy), obciążenie/opis (AI proponuje w kg), zrobione_serie×powtórzenia (faktycznie wykonane — wpisuję w aktywnym planie; sugestia AI zostaje w serie/powtórzenia jako placeholder), ocena (1-5, null = brak — to ocena WYKONANIA w danym tygodniu, nie mylić z oceną preferencji w exercise_catalog), uwaga (tekst, od AI — tylko do czytania w aktywnym planie).
 
@@ -186,6 +209,13 @@ Każdy etap kończy się czymś, co działa — nie idziemy dalej, dopóki poprz
   Profil; Profil = pod-zakładki Sprzęt, Ćwiczenia, Parametry, Historia (przeniesiona
   z osobnej zakładki). Plus fix: gwiazdki (Stars) z type="button", bo klik w gwiazdkę
   w formularzu profilu wysyłał formularz (przedwczesne przejście kroku onboardingu).
+- **Etap 15 — multi-user (req 27):** user_id w profile/equipment/exercise_catalog/plans
+  (migracja przebudowuje equipment i exercise_catalog, by zrzucić UNIQUE na nazwach;
+  istniejące dane dostają user_id pierwszego konta), seeding sprzętu i katalogu per
+  nowe konto (seed_user_data), logowanie dwuetapowe: konto z pustym hasłem →
+  POST /api/auth/login zwraca setup_required → POST /api/auth/set-password ustawia
+  hasło i loguje; wszystkie endpointy filtrują dane po zalogowanym użytkowniku;
+  Login.jsx z trybem "ustaw hasło".
 
 ## Decyzje domyślne (do podważenia w każdej chwili)
 

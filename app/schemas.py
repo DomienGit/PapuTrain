@@ -151,3 +151,10 @@ class LoginRequest(SQLModel):
 class TokenResponse(SQLModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class SetPasswordRequest(SQLModel):
+    """Pierwsze logowanie konta utworzonego bez hasła (req 27)."""
+
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=8, max_length=200)

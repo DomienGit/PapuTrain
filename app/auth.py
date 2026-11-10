@@ -13,8 +13,11 @@ import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlmodel import select
 
 from app.config import settings
+from app.database import SessionDep
+from app.models import User
 
 # auto_error=False => brak nagłówka dostaje nasz własny 401, nie domyślny 403
 _bearer = HTTPBearer(auto_error=False)
@@ -56,3 +59,22 @@ def get_current_user(
 
 
 CurrentUser = Annotated[str, Depends(get_current_user)]
+
+
+def get_user_row(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    session: SessionDep = None,
+) -> User:
+    """Jak get_current_user, ale zwraca CAŁY wiersz konta (req 27): routery
+    filtrują dane po user.id, żeby każdy user widział tylko swoje rzeczy."""
+    username = get_current_user(credentials)
+    user = session.exec(select(User).where(User.username == username)).first()
+    if user is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Konto nie istnieje — zaloguj się ponownie"
+        )
+    return user
+
+
+# Zależność FastAPI dla routerów: dostają obiekt User zalogowanego konta.
+CurrentUserObj = Annotated[User, Depends(get_user_row)]
