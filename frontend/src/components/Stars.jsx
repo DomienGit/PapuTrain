@@ -10,6 +10,7 @@ export default function Stars({ value, onChange, label = 'ocena' }) {
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
+          type="button"
           onClick={() => onChange(n)}
           aria-label={`${label}: ${n} z 5`}
           className={`text-lg leading-none transition-colors ${
