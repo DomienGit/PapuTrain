@@ -69,11 +69,12 @@ N treningów do wykonania w dowolne dni, we własnym rytmie.
    Sprzęcie.
 27. Konta wieloosobowe (2026-11-10): aplikacja obsługuje wiele kont z WŁASNYMI danymi
    (profil, sprzęt, katalog ćwiczeń z ocenami, plany, historia — każdy widzi tylko swoje).
-   Bez ekranu rejestracji: konto tworzy admin z CLI na serwerze
-   (`python -m app.create_user <login>`), hasło może zostać puste. Konto bez hasła przy
-   pierwszym logowaniu dostaje ekran "ustaw hasło" (hasło + powtórzenie); po ustawieniu
-   user jest od razu zalogowany. Admin może też CLI-em zresetować komuś hasło.
-   Logowanie: 5 prób/min (ochrona przed zgadywaniem).
+   Bez ekranu rejestracji i bez pytań o hasło: konto tworzy admin z CLI na serwerze
+   (`python -m app.create_user <login>` — samo login wystarczy), hasła nieustawione.
+   Przy pierwszym logowaniu user dostaje ekran "ustaw hasło" (hasło + powtórzenie);
+   po ustawieniu jest od razu zalogowany. Admin może CLI-em ustawić komuś hasło od razu
+   (--set-password) albo wyczyścić je (ponowne create_user bez flagi = user ustawi nowe
+   przy logowaniu). Logowanie: 5 prób/min (ochrona przed zgadywaniem).
 26. Nawigacja główna — TRZY zakładki (2026-11-10): **Trening** (aktywny plan, szkic,
    generowanie), **Stoper**, **Profil**. Zakładka Profil ma cztery pod-zakładki:
    Sprzęt, Ćwiczenia, Parametry (d. "Profil" — pełny formularz, req 25) i Historia

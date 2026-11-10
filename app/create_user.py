@@ -1,14 +1,19 @@
 """Narzędzie admina do zarządzania kontami (req 27 — aplikacja jest wieloosobowa).
 
 Użycie:
-    python -m app.create_user <login>
+    python -m app.create_user <login>            # konto bez hasła
+    python -m app.create_user <login> --set-password  # ustaw/zresetuj hasło
 
-Hasło pytane dwukrotnie przez getpass — nie pojawia się w historii powłoki
-ani na ekranie. ENTER (puste hasło) tworzy konto bez hasła: użytkownik ustawi
-je sam przy pierwszym logowaniu (ekran "ustaw hasło"). Nowe konto dostaje od
-razu własny sprzęt predefiniowany i wbudowany katalog ćwiczeń (seed_user_data).
-Jeśli konto o tym loginie już istnieje, nadpisane zostaje hasło (reset hasła
-przez admina); dane konta zostają nietknięte.
+Domyślnie tworzy konto BEZ hasła — użytkownik ustawi je sam przy pierwszym
+logowaniu (ekran "ustaw hasło"). Konto dostaje od razu własny sprzęt
+predefiniowany i wbudowany katalog ćwiczeń (seed_user_data).
+
+Jeśli konto o tym loginie już istnieje:
+    - bez flagi: hasło zostaje WYCZYSZCZONE (użytkownik przy następnym
+      logowaniu ustawi nowe — taki jest "reset hasła" przez admina),
+    - z flagą --set-password: admin wpisuje nowe hasło (min. 8 znaków,
+      getpass — nie widać go na ekranie i nie ląduje w historii powłoki).
+Dane konta (profil, plany itd.) zostają zawsze nietknięte.
 """
 
 import argparse
@@ -22,24 +27,33 @@ from app.database import engine, init_db, seed_user_data
 from app.models import User
 
 
+def ask_password() -> str:
+    """Hasło od admina, dwukrotnie (kontrola literówki), min. 8 znaków."""
+    password = getpass.getpass("Hasło (min. 8 znaków): ")
+    repeat = getpass.getpass("Powtórz hasło: ")
+    if password != repeat:
+        print("Hasła nie są identyczne — nie zapisano niczego.", file=sys.stderr)
+        raise SystemExit(1)
+    if len(password) < 8:
+        print("Hasło musi mieć co najmniej 8 znaków.", file=sys.stderr)
+        raise SystemExit(1)
+    return password
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Utwórz konto PapuTrain albo zresetuj jego hasło"
     )
-    parser.add_argument("username", help="login, np. dominik")
+    parser.add_argument("username", help="login, np. kasia")
+    parser.add_argument(
+        "--set-password",
+        action="store_true",
+        help="ustaw hasło teraz (domyślnie: konto bez hasła — użytkownik "
+        "ustawi je przy pierwszym logowaniu)",
+    )
     args = parser.parse_args()
 
-    print("Hasło (min. 8 znaków). ENTER = puste — użytkownik ustawi")
-    print("je sam przy pierwszym logowaniu.")
-    password = getpass.getpass("Hasło: ")
-    if password:
-        repeat = getpass.getpass("Powtórz hasło: ")
-        if password != repeat:
-            print("Hasła nie są identyczne — nie zapisano niczego.", file=sys.stderr)
-            return 1
-        if len(password) < 8:
-            print("Hasło musi mieć co najmniej 8 znaków.", file=sys.stderr)
-            return 1
+    password = ask_password() if args.set_password else ""
 
     init_db()
     with Session(engine) as session:
@@ -51,7 +65,10 @@ def main() -> int:
             if password:
                 print(f"Zresetowano hasło konta '{args.username}'.")
             else:
-                print(f"Konto '{args.username}' będzie wymagać ustawienia hasła przy logowaniu.")
+                print(
+                    f"Wyczyszczono hasło konta '{args.username}' — użytkownik ustawi "
+                    f"nowe przy następnym logowaniu."
+                )
             return 0
 
         user = User(
