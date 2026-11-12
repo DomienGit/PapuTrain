@@ -284,13 +284,13 @@ function ExerciseRow({ workout, exercise, onChange, setError }) {
   return (
     <li className="py-2">
       <div className="flex justify-between gap-2">
-        <span className="text-zinc-900">
+        <span className="min-w-0 text-zinc-900">
           {exercise.name}
           {exercise.muscle_group && (
             <span className="text-zinc-400"> ({exercise.muscle_group})</span>
           )}
         </span>
-        <span className="shrink-0 text-sm text-zinc-500">
+        <span className="min-w-0 text-right text-sm break-words text-zinc-500">
           {exercise.sets} × {exercise.reps}
           {exercise.load && ` · ${exercise.load}`}
         </span>

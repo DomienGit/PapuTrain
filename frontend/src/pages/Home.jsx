@@ -214,7 +214,7 @@ function ExerciseFeedback({ workout, exercise, number, patchPlan }) {
             <span className="text-zinc-400"> ({exercise.muscle_group})</span>
           )}
         </span>
-        <span className="shrink-0 text-sm text-zinc-500">
+        <span className="min-w-0 text-right text-sm break-words text-zinc-500">
           {exercise.sets} × {exercise.reps}
           {exercise.load && ` · ${exercise.load}`}
         </span>
@@ -252,7 +252,6 @@ function ExerciseFeedback({ workout, exercise, number, patchPlan }) {
                 onBlur={(e) => saveField('performed', e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 placeholder={`${exercise.sets}×${exercise.reps}`} // sugestia AI jako wzór
-                inputMode="numeric"
                 className="w-24 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none"
                 aria-label={`faktycznie zrobione serie×powtórzenia: ${exercise.name}`}
               />

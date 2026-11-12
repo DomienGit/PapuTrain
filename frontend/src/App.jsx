@@ -20,6 +20,8 @@ export default function App() {
   // startedAt = moment ostatniego startu. Wyświetlany czas to suma.
   const [stopwatch, setStopwatch] = useState({ running: false, baseMs: 0, startedAt: null })
   const [, setTick] = useState(0) // sekundowy "tik" wymusza przerysowanie zegara
+  // Okrążenia (req 20, 2026-11-12): czasy łączne w momencie kliknięcia.
+  const [laps, setLaps] = useState([])
 
   function startStopwatch() {
     setStopwatch((s) =>
@@ -37,6 +39,16 @@ export default function App() {
 
   function resetStopwatch() {
     setStopwatch({ running: false, baseMs: 0, startedAt: null })
+    setLaps([])
+  }
+
+  // Czas liczony świeżo w chwili kliknięcia (elapsedMs w renderze może
+  // być sekundę wstecz — tik zegara przerysowuje ekran co 1 s).
+  function addLap() {
+    setLaps((l) => [
+      ...l,
+      stopwatch.baseMs + (stopwatch.running ? Date.now() - stopwatch.startedAt : 0),
+    ])
   }
 
   useEffect(() => {
@@ -92,9 +104,11 @@ export default function App() {
         <StopWatch
           elapsedMs={elapsedMs}
           running={stopwatch.running}
+          laps={laps}
           onStart={startStopwatch}
           onStop={stopStopwatch}
           onReset={resetStopwatch}
+          onLap={addLap}
         />
       )}
 
