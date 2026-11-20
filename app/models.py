@@ -127,3 +127,17 @@ class Exercise(SQLModel, table=True):
     performed: str = ""  # FAKTYCZNIE zrobione, np. "3×12" — wpisuje użytkownik (req 21)
     rating: int | None = None
     note: str = ""  # uwaga, np. "boli kolano przy przysiadzie"
+
+
+class PushSubscription(SQLModel, table=True):
+    """Subskrypcja Web Push jednego urządzenia (req 31). Przeglądarka podaje
+    endpoint (adres usługi push, np. FCM Google dla Chrome na Androidzie) i dwa
+    klucze do szyfrowania treści powiadomienia. Jedno konto = wiele urządzeń."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="users.id")
+    endpoint: str = Field(unique=True)
+    p256dh: str
+    auth: str

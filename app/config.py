@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     # Kolejność modeli przy wyczerpaniu darmowego limitu (429): API próbuje po kolei.
     gemini_models: str = "gemini-3.6-flash,gemini-3-flash-preview,gemini-3.5-flash-lite,gemini-3.1-flash-lite"
 
+    # Web Push (req 31). Puste klucze = powiadomienia wyłączone (reszta działa).
+    # Wygeneruj parę: python -m app.generate_vapid
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    # "Kontakt" wysyłany usłudze push (wymóg standardu VAPID) — adres aplikacji.
+    vapid_subject: str = "https://paputrain.duckdns.org"
+
     @property
     def gemini_models_list(self) -> list[str]:
         return [m.strip() for m in self.gemini_models.split(",") if m.strip()]

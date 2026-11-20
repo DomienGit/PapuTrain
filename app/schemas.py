@@ -158,3 +158,19 @@ class SetPasswordRequest(SQLModel):
 
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=200)
+
+
+class PushKeys(SQLModel):
+    p256dh: str = Field(min_length=1, max_length=200)
+    auth: str = Field(min_length=1, max_length=100)
+
+
+class PushSubscriptionIn(SQLModel):
+    """Subskrypcja w formacie PushSubscription.toJSON() z przeglądarki (req 31)."""
+
+    endpoint: str = Field(min_length=1, max_length=1000)
+    keys: PushKeys
+
+
+class PushUnsubscribeIn(SQLModel):
+    endpoint: str = Field(min_length=1, max_length=1000)

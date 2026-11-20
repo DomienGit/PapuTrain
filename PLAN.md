@@ -169,6 +169,8 @@ Nawigacja główna (req 26, 2026-11-10): trzy zakładki na dole ekranu — **Tre
 
 Powiadomienia o błędach (req 30, 2026-11-20): błędy w aplikacji (np. przeciążone Gemini) pokazują się jako czerwone powiadomienie PRZYKLEJONE do dołu ekranu — nad dolną nawigacją, a gdy widać pasek stopera, nad nim; nie przewija się z treścią. Znika po kliknięciu × albo przy kolejnej próbie. Ekrany logowania i onboardingu oraz drobne podpowiedzi przy polach formularza zostają w treści.
 
+Powiadomienia push (req 31, 2026-11-20): gdy AI skończy generować plan — z sukcesem ("Plan na Tydzień N gotowy") albo błędem ("AI nie dało rady, spróbuj ponownie") — telefon dostaje powiadomienie systemowe, także przy ZAMKNIĘTEJ aplikacji. Technologia: Web Push (standard przeglądarek) — service worker `sw.js` TYLKO do powiadomień (bez cache plików, żeby deploy dalej od razu podmieniał wersję), klucze VAPID w .env serwera (bez nich push wyłączony, reszta działa), subskrypcje w tabeli `push_subscriptions` (per użytkownik, per urządzenie), wysyłka biblioteką pywebpush. Włącznik "Powiadomienia" w Profilu → Parametry (zgoda telefonu wymagana raz). Gdy aplikacja jest otwarta na ekranie, powiadomienie się nie pokazuje (widać wynik od razu). Docelowo Android/Chrome. Plan B: brak powiadomienia nic nie psuje — po otwarciu aplikacja i tak pokazuje szkic.
+
 ## Przepływ generowania kolejnego tygodnia
 
 1. Warunek startowy: wszystkie treningi aktualnego planu odhaczone jako wykonane. Jeśli nie — przycisk "Generuj następny tydzień" jest nieaktywny z podpowiedzią "odhacz wszystkie treningi".

@@ -9,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from app.auth import get_current_user
 from app.database import init_db
 from app.limiter import limiter
-from app.routers import auth, catalog, equipment, plans, profile
+from app.routers import auth, catalog, equipment, plans, profile, push
 
 # Logi aplikacyjne (np. który model Gemini odpowiedział) idą na stderr razem z logami uvicorn.
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +44,7 @@ app.include_router(profile.router, dependencies=auth_deps)
 app.include_router(equipment.router, dependencies=auth_deps)
 app.include_router(catalog.router, dependencies=auth_deps)
 app.include_router(plans.router, dependencies=auth_deps)
+app.include_router(push.router, dependencies=auth_deps)
 app.include_router(auth.router)  # publiczny — sam endpoint logowania
 
 

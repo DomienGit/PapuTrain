@@ -32,6 +32,7 @@ from app.models import (
     User,
     Workout,
 )
+from app.push import notify_user
 from app.schemas import (
     AiExercise,
     AiPlan,
@@ -163,7 +164,16 @@ def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
             raise HTTPException(status.HTTP_409_CONFLICT, "AI już generuje plan — poczekaj")
         _generating.add(user.id)
     try:
-        return _generate_plan(user, session)
+        plan = _generate_plan(user, session)
+        # Req 31: powiadomienie push — dochodzi także przy zamkniętej aplikacji.
+        notify_user(session, user.id, "Plan gotowy 💪", f"{plan['week_title']} czeka na zatwierdzenie")
+        return plan
+    except HTTPException as err:
+        # 503 = AI zawiodło, 422 = AI zwróciło zły plan. Pozostałe (409) są
+        # natychmiastowe — użytkownik widzi je od razu, push niepotrzebny.
+        if err.status_code in (503, 422):
+            notify_user(session, user.id, "Nie udało się ułożyć planu", "AI nie dało rady — spróbuj ponownie")
+        raise
     finally:
         # finally = wykona się zawsze: po sukcesie i po błędzie (503/422/409).
         with _generating_lock:

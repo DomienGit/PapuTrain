@@ -5,6 +5,7 @@ import ExerciseList from '../components/ExerciseList'
 import History from './History'
 import ProfileForm from '../components/ProfileForm'
 import ErrorToast from '../components/ErrorToast'
+import PushToggle from '../components/PushToggle'
 
 /**
  * Zakładka "Profil" (PLAN.md: ekran 3, req 26). Dostępna zawsze, także gdy
@@ -78,6 +79,7 @@ export default function EquipmentExercises() {
           ) : (
             <ProfileForm initial={profile} submitLabel="Zapisz" onSaved={setProfile} />
           )}
+          <PushToggle />
         </div>
       )}
     </div>
