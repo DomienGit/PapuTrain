@@ -4,6 +4,7 @@ import EquipmentList from '../components/EquipmentList'
 import ExerciseList from '../components/ExerciseList'
 import History from './History'
 import ProfileForm from '../components/ProfileForm'
+import ErrorToast from '../components/ErrorToast'
 
 /**
  * Zakładka "Profil" (PLAN.md: ekran 3, req 26). Dostępna zawsze, także gdy
@@ -71,9 +72,7 @@ export default function EquipmentExercises() {
             Tutaj aktualizujesz swoje dane: cel, poziom, parametry ciała i preferencje
             partii. AI korzysta z nich przy każdym generowaniu planu.
           </p>
-          {error && (
-            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-          )}
+          <ErrorToast message={error} onClose={() => setError('')} />
           {profile === null ? (
             <p className="text-sm text-zinc-500">Ładowanie…</p>
           ) : (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import MusclePreferences from './MusclePreferences'
+import ErrorToast from './ErrorToast'
 
 const LEVELS = ['początkujący', 'średni', 'zaawansowany']
 
@@ -174,9 +175,7 @@ export default function ProfileForm({ initial, submitLabel, onSaved }) {
         <MusclePreferences value={musclePrefs} onChange={setMusclePrefs} />
       </div>
 
-      {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
       {message && <p className="text-sm text-green-700">{message}</p>}
 
       <button

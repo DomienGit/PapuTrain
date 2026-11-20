@@ -97,7 +97,12 @@ export default function App() {
   if (needsOnboarding) return <Onboarding onDone={() => setNeedsOnboarding(false)} />
 
   return (
-    <div className="min-h-dvh bg-zinc-100 pb-20">
+    <div
+      className="min-h-dvh bg-zinc-100 pb-20"
+      // Wysokość powiadomień o błędach (ErrorToast): nad nawigacją, a gdy widać
+      // pasek stopera — nad nim (req 30).
+      style={{ '--toast-bottom': elapsedMs > 0 ? '7rem' : '4.5rem' }}
+    >
       {tab === 'trening' && <Home username={username} />}
       {tab === 'profil' && <EquipmentExercises />}
       {tab === 'stoper' && (

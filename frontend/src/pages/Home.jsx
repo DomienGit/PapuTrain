@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import DraftPanel from '../components/DraftPanel'
 import Stars from '../components/Stars'
+import ErrorToast from '../components/ErrorToast'
 
 /**
  * Ekran główny. Trzy stany (PLAN.md ekran 4 i 6):
@@ -80,9 +81,7 @@ export default function Home({ username }) {
       <h1 className="text-xl font-bold text-zinc-900">PapuTrain</h1>
       <p className="mt-0.5 text-sm text-zinc-500">Cześć, {username}!</p>
 
-      {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       {plan ? (
         plan.status === 'draft' ? (
@@ -143,9 +142,7 @@ function PlanView({ plan, onChange, onGenerate, generating }) {
         </p>
       )}
 
-      {error && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       <div className="mt-3 space-y-4">
         {plan.workouts.map((workout) => (

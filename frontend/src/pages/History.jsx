@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import ErrorToast from '../components/ErrorToast'
 
 /**
  * Podzakładka "Historia" w zakładce "Profil" (Etap 8, PLAN.md ekran 7, req 26):
@@ -28,9 +29,7 @@ export default function History() {
 
   return (
     <div>
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       {openPlan ? (
         <ArchivedPlanDetail plan={openPlan} onBack={() => setOpenPlan(null)} />

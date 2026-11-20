@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import Stars from './Stars'
+import ErrorToast from './ErrorToast'
 
 const sourceBadge = {
   builtin: '',
@@ -128,9 +129,7 @@ export default function ExerciseList({ ownedNames, allowAdd = false }) {
         </form>
       )}
 
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       {sorted.length === 0 ? (
         <p className="rounded-xl bg-white p-4 text-center text-sm text-zinc-500 shadow-sm">

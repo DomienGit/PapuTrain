@@ -167,6 +167,8 @@ Nawigacja główna (req 26, 2026-11-10): trzy zakładki na dole ekranu — **Tre
    odrzuć i wygeneruj od nowa.
 7. **Historia** — lista archiwalnych planów, kliknięcie pokazuje pełny plan. Od req 26 nie ma własnej zakładki — podzakładka w ekranie "Profil" (ekran 3).
 
+Powiadomienia o błędach (req 30, 2026-11-20): błędy w aplikacji (np. przeciążone Gemini) pokazują się jako czerwone powiadomienie PRZYKLEJONE do dołu ekranu — nad dolną nawigacją, a gdy widać pasek stopera, nad nim; nie przewija się z treścią. Znika po kliknięciu × albo przy kolejnej próbie. Ekrany logowania i onboardingu oraz drobne podpowiedzi przy polach formularza zostają w treści.
+
 ## Przepływ generowania kolejnego tygodnia
 
 1. Warunek startowy: wszystkie treningi aktualnego planu odhaczone jako wykonane. Jeśli nie — przycisk "Generuj następny tydzień" jest nieaktywny z podpowiedzią "odhacz wszystkie treningi".

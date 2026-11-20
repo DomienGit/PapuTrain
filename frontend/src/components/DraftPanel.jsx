@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api'
+import ErrorToast from './ErrorToast'
 
 /**
  * Panel szkicu (Etap 6, PLAN.md ekran 6): oglądanie wygenerowanego planu,
@@ -56,9 +57,7 @@ export default function DraftPanel({ plan, onChange, onRejected }) {
         </p>
       )}
 
-      {error && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       <div className="mt-3 space-y-4">
         {plan.workouts.map((workout) => (

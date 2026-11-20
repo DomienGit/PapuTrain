@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import ErrorToast from './ErrorToast'
 
 const typeBadge = {
   predefined: 'z katalogu',
@@ -198,9 +199,7 @@ export default function EquipmentList({ allowAdd = false }) {
         </form>
       )}
 
-      {error && (
-        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      <ErrorToast message={error} onClose={() => setError('')} />
 
       <ul className="divide-y divide-zinc-100 rounded-xl bg-white shadow-sm">
         {sorted.map((item) => {
