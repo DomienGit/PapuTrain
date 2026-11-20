@@ -53,7 +53,9 @@ export default function App() {
 
   useEffect(() => {
     if (!stopwatch.running) return
-    const interval = setInterval(() => setTick((t) => t + 1), 1000)
+    // 4× na sekundę: zegar "od okrążenia" (req 32) zmienia sekundę najwyżej
+    // 0,25 s po czasie — przy odświeżaniu co 1 s spóźniał się nawet o sekundę.
+    const interval = setInterval(() => setTick((t) => t + 1), 250)
     return () => clearInterval(interval)
   }, [stopwatch.running])
 

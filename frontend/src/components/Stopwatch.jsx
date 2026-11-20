@@ -1,6 +1,7 @@
 /**
  * Zakładka "Stoper" (Etap 7, PLAN.md req 20): duży zegar start/stop/reset
  * + okrążenia (2026-11-12): klik zapisuje międzyczas, lista pod zegarem.
+ * + bieżące okrążenie (req 32): drugi zegar "od okrążenia N" = czas przerwy.
  * Czas włączam RAZ na początku treningu — leci dalej, nawet gdy chodzę
  * po innych zakładkach (stan siedzi w App.jsx, nie tu). Przerwy z planu
  * czytam sam z tego zegara — żadnych timerów odliczających.
@@ -30,6 +31,23 @@ export default function StopWatch({ elapsedMs, running, laps = [], onStart, onSt
       <p className="mt-2 text-sm text-zinc-500">
         {running ? 'czas leci…' : elapsedMs > 0 ? 'zatrzymany' : 'gotowy'}
       </p>
+
+      {/* Bieżące okrążenie (req 32): czas od ostatniego kliknięcia "Okrążenie" —
+          po serii klikam i widzę, ile już trwa przerwa. */}
+      {laps.length > 0 && (
+        <div className="mt-6 text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            od okrążenia {laps.length}
+          </p>
+          <p
+            className={`font-mono text-4xl font-bold tabular-nums ${
+              running ? 'text-emerald-600' : 'text-zinc-400'
+            }`}
+          >
+            {formatTime(elapsedMs - laps[laps.length - 1])}
+          </p>
+        </div>
+      )}
 
       <div className="mt-10 flex w-full gap-2">
         {running ? (
@@ -92,8 +110,8 @@ export default function StopWatch({ elapsedMs, running, laps = [], onStart, onSt
       <p className="mt-8 text-center text-xs text-zinc-400">
         Włącz raz na początku treningu — czas leci cały czas, także po wyjściu z tej zakładki.
         Przerwy między seriami czytaj z zegara; wartości z planu są tylko informacją.
-        Klik „Okrążenie” po każdej serii — różnica między okrążeniami pokaże dokładną
-        długość przerwy.
+        Klik „Okrążenie” po każdej serii — zielony zegar „od okrążenia” pokazuje, ile
+        trwa bieżąca przerwa.
       </p>
     </div>
   )
