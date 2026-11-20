@@ -4,7 +4,8 @@ Panel edycji i zatwierdzania szkicu powstał w Etapie 6 — tu tylko dane.
 Od req 27 wszystkie dane są per konto: każdy select na planach/profilu/
 sprzęcie/katalogu filtruje po id zalogowanego użytkownika.
 Zasady (PLAN.md): szkic zawsze maksymalnie jeden (nowy nadpisuje stary),
-generowanie zablokowane, dopóki aktywny plan ma nieodhaczone treningi.
+generowanie zablokowane, dopóki aktywny plan ma nieodhaczone treningi,
+udane generowanie archiwizuje aktywny plan (req 28).
 """
 
 from datetime import date
@@ -163,10 +164,17 @@ def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
         raise HTTPException(status.HTTP_409_CONFLICT, "Najpierw uzupełnij profil w kreatorze")
 
     # Poprzedni plan z wynikami (oceny, uwagi, daty) — AI progresuje na jego bazie.
+    # Aktywnego może nie być (req 28: archiwizuje się już przy generowaniu), wtedy
+    # bierzemy ostatni archiwalny — np. przy ponownym generowaniu szkicu.
+    previous = active or session.exec(
+        select(Plan)
+        .where(Plan.status == "archived", Plan.user_id == user.id)  # type: ignore[arg-type]
+        .order_by(Plan.week_number.desc(), Plan.id.desc())  # type: ignore[attr-defined]
+    ).first()
     history = None
-    if active is not None:
+    if previous is not None:
         workouts = session.exec(
-            select(Workout).where(Workout.plan_id == active.id).order_by(Workout.number)  # type: ignore[arg-type]
+            select(Workout).where(Workout.plan_id == previous.id).order_by(Workout.number)  # type: ignore[arg-type]
         ).all()
         history = [(w, _workout_exercises(session, w)) for w in workouts]
 
@@ -178,11 +186,14 @@ def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
     catalog = list(
         session.exec(select(CatalogExercise).where(CatalogExercise.user_id == user.id)).all()  # type: ignore[arg-type]
     )
+    # Szkice się nie liczą — inaczej każde ponowne generowanie podbijało numer.
     week_number = (
         max(
             (
                 p.week_number
-                for p in session.exec(select(Plan).where(Plan.user_id == user.id)).all()  # type: ignore[arg-type]
+                for p in session.exec(
+                    select(Plan).where(Plan.user_id == user.id, Plan.status != "draft")  # type: ignore[arg-type]
+                ).all()
             ),
             default=0,
         )
@@ -207,6 +218,12 @@ def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
     ).first()
     if old_draft is not None:
         _delete_plan(session, old_draft)
+
+    # Req 28: aktywny plan idzie do archiwum już teraz (dopiero po udanej odpowiedzi
+    # AI, żeby błąd Gemini nie zostawił użytkownika bez planu).
+    if active is not None:
+        active.status = "archived"
+        session.add(active)
 
     plan = Plan(
         status="draft",
@@ -312,7 +329,8 @@ def _workout_exercises(session, workout: Workout) -> list[Exercise]:
 
 @router.post("/draft/approve")
 def approve_draft(user: CurrentUserObj, session: SessionDep) -> dict:
-    """Szkic staje się planem aktywnym; dotychczasowy aktywny przechodzi do archiwum."""
+    """Szkic staje się planem aktywnym. Od req 28 stary aktywny jest archiwizowany już
+    przy generowaniu; ta archiwizacja zostaje na wypadek starszych danych (aktywny + szkic)."""
     draft = _get_draft_or_404(session, user)
     old_active = session.exec(
         select(Plan).where(Plan.status == "active", Plan.user_id == user.id)  # type: ignore[arg-type]

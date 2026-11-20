@@ -174,8 +174,9 @@ Nawigacja główna (req 26, 2026-11-10): trzy zakładki na dole ekranu — **Tre
 3. Backend zbiera: profil (z preferencjami partii, req 23) + sprzęt (posiadany) + katalog ćwiczeń z ocenami 1-5 i zaznaczeniami "pasuje" + ostatni aktywny plan + oceny wykonania 1-5 + uwagi + odhaczone treningi (z datami wykonania — AI widzi realny rytm) + FAKTYCZNIE wykonane serie×powtórzenia i obciążenia (pole "zrobiłem" i load — AI porównuje je z własnymi sugestiami i kalibruje progresję).
 4. Buduje prompt (instrukcję dla AI) i wysyła do Gemini. Twarde zasady w instrukcji: (a) używać WYŁĄCZNIE ćwiczeń bez sprzętu, z domowymi zamiennikami (stół, krzesło, ściana, podłoga) lub z posiadanego sprzętu; (b) NIE przypisywać treningów do dni kalendarzowych — N treningów ponumerowanych do wykonania w dowolne dni tygodnia; (c) zawsze podawać przerwy między seriami i między ćwiczeniami; progresja może polegać także na skróceniu/wydłużeniu przerw (krótsze przerwy gdy ćwiczenia łatwe, dłuższe gdy trudne).
 5. Gemini zwraca JSON → walidacja → zapis jako draft → nowe ćwiczenia (nieznane w katalogu) dopisują się do katalogu ze źródłem "AI".
+   Od 2026-11-20 (req 28): w tym samym momencie (dopiero po udanej odpowiedzi AI) dotychczasowy aktywny plan przechodzi do ARCHIWUM, a ekran główny od razu pokazuje szkic. Numer tygodnia = najwyższy numer spośród planów aktywnych/archiwalnych + 1 (szkice się nie liczą, więc ponowne generowanie nie podbija numeru). Ponowne generowanie / odrzucenie szkicu bierze historię z ostatniego planu archiwalnego. Po odrzuceniu szkicu nie ma planu aktywnego — ekran pokazuje "Generuj plan".
 6. Ja oglądam draft, ewentualnie edytuję / proszę AI o poprawki.
-7. Klikam "Zatwierdź" → draft staje się planem aktywnym, stary plan przechodzi do archiwum.
+7. Klikam "Zatwierdź" → draft staje się planem aktywnym (stary plan jest już w archiwum od kroku 5).
 
 ## Etapy prac
 

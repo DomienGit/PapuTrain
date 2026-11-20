@@ -17,11 +17,12 @@ export default function Home({ username }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // Najpierw aktywny plan, potem szkic — 404 oznacza "nie ma", to nie błąd.
-    api('/api/plans/active')
+    // Najpierw szkic, potem aktywny plan — 404 oznacza "nie ma", to nie błąd.
+    // Szkic ma pierwszeństwo: to on czeka na decyzję (req 28).
+    api('/api/plans/draft')
       .then(setPlan)
       .catch(() =>
-        api('/api/plans/draft')
+        api('/api/plans/active')
           .then(setPlan)
           .catch(() => {})
           .finally(() => setLoaded(true)),
