@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import DraftPanel from '../components/DraftPanel'
 import Stars from '../components/Stars'
@@ -16,18 +16,43 @@ export default function Home({ username }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    // Najpierw szkic, potem aktywny plan — 404 oznacza "nie ma", to nie błąd.
-    // Szkic ma pierwszeństwo: to on czeka na decyzję (req 28).
-    api('/api/plans/draft')
+  // Najpierw szkic, potem aktywny plan — 404 oznacza "nie ma", to nie błąd.
+  // Szkic ma pierwszeństwo: to on czeka na decyzję (req 28).
+  function loadPlan() {
+    return api('/api/plans/draft')
       .then(setPlan)
       .catch(() =>
         api('/api/plans/active')
           .then(setPlan)
-          .catch(() => {})
-          .finally(() => setLoaded(true)),
+          .catch(() => setPlan(null)),
       )
       .finally(() => setLoaded(true))
+  }
+
+  // Req 29: czy serwer nadal generuje plan. Stan "busy" z Reacta ginie po
+  // przełączeniu zakładki / zamknięciu aplikacji, więc pytamy serwer
+  // co 3 s, aż skończy — dopiero wtedy odblokowujemy przycisk i ładujemy szkic.
+  const unmounted = useRef(false)
+  async function waitForGeneration() {
+    setBusy(true)
+    while (!unmounted.current) {
+      const { generating } = await api('/api/plans/generating').catch(() => ({ generating: false }))
+      if (!generating) break
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+    if (unmounted.current) return
+    await loadPlan()
+    setBusy(false)
+  }
+
+  useEffect(() => {
+    unmounted.current = false
+    api('/api/plans/generating')
+      .then(({ generating }) => (generating ? waitForGeneration() : loadPlan()))
+      .catch(() => loadPlan())
+    return () => {
+      unmounted.current = true
+    }
   }, [])
 
   async function generate() {
@@ -36,10 +61,17 @@ export default function Home({ username }) {
     try {
       const draft = await api('/api/plans/generate', { method: 'POST' })
       setPlan(draft)
-    } catch (err) {
-      setError(err.message)
-    } finally {
       setBusy(false)
+    } catch (err) {
+      // Generowanie mogło już trwać (np. z drugiego urządzenia) — wtedy czekamy
+      // na nie zamiast pokazywać błąd.
+      const status = await api('/api/plans/generating').catch(() => ({ generating: false }))
+      if (status.generating) {
+        await waitForGeneration()
+      } else {
+        setError(err.message)
+        setBusy(false)
+      }
     }
   }
 

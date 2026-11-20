@@ -9,6 +9,7 @@ udane generowanie archiwizuje aktywny plan (req 28).
 """
 
 from datetime import date
+from threading import Lock
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
@@ -43,6 +44,12 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
+
+# Req 29: kto właśnie generuje plan. Trzymane w pamięci procesu — wystarcza,
+# bo backend działa jako JEDEN proces uvicorna (przy kilku workerach trzeba by
+# przenieść to do bazy). Lock, bo endpointy synchroniczne działają w wątkach.
+_generating: set[int] = set()
+_generating_lock = Lock()
 
 
 def _plan_to_dict(session, plan: Plan) -> dict:
@@ -142,8 +149,28 @@ def _exercise_from_ai(
     )
 
 
+@router.get("/generating")
+def generation_status(user: CurrentUserObj) -> dict:
+    """Czy AI właśnie generuje plan dla tego konta — frontend blokuje wtedy przycisk
+    także po przełączeniu zakładki albo ponownym otwarciu aplikacji."""
+    return {"generating": user.id in _generating}
+
+
 @router.post("/generate")
 def generate_plan_endpoint(user: CurrentUserObj, session: SessionDep) -> dict:
+    with _generating_lock:
+        if user.id in _generating:
+            raise HTTPException(status.HTTP_409_CONFLICT, "AI już generuje plan — poczekaj")
+        _generating.add(user.id)
+    try:
+        return _generate_plan(user, session)
+    finally:
+        # finally = wykona się zawsze: po sukcesie i po błędzie (503/422/409).
+        with _generating_lock:
+            _generating.discard(user.id)
+
+
+def _generate_plan(user: User, session) -> dict:
     active = session.exec(
         select(Plan).where(Plan.status == "active", Plan.user_id == user.id)  # type: ignore[arg-type]
     ).first()
