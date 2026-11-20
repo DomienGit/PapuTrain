@@ -88,8 +88,9 @@ export default function PushToggle() {
     setError('')
     setInfo('')
     try {
-      await api('/api/push/test', { method: 'POST' })
-      setInfo('Wysłane. Jeśli aplikacja jest na ekranie, powiadomienie się nie pokaże — zamknij ją na chwilę i wyślij ponownie.')
+      const { delay_s } = await api('/api/push/test', { method: 'POST' })
+      // Przy otwartej aplikacji powiadomienie się nie pokazuje — stąd opóźnienie.
+      setInfo(`Zamknij aplikację — powiadomienie przyjdzie za ${delay_s} s.`)
     } catch (err) {
       setError(err.message)
     } finally {

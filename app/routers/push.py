@@ -4,17 +4,23 @@ Frontend pobiera klucz publiczny VAPID, prosi telefon o zgodę i subskrypcję,
 a wynik (endpoint + klucze) zapisuje tutaj. Wysyłka: app/push.py.
 """
 
-from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select
+import time
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from sqlmodel import Session, select
 
 from app.auth import CurrentUserObj
 from app.config import settings
-from app.database import SessionDep
+from app.database import SessionDep, engine
 from app.models import PushSubscription
 from app.push import is_allowed_endpoint, notify_user, push_enabled
 from app.schemas import PushSubscriptionIn, PushUnsubscribeIn
 
 router = APIRouter(prefix="/api/push", tags=["push"])
+
+# Opóźnienie powiadomienia testowego: czas na zamknięcie aplikacji — przy
+# otwartej aplikacji sw.js celowo nie pokazuje powiadomienia.
+TEST_DELAY_S = 10
 
 
 @router.get("/public-key")
@@ -59,9 +65,23 @@ def unsubscribe(data: PushUnsubscribeIn, user: CurrentUserObj, session: SessionD
 
 
 @router.post("/test")
-def send_test(user: CurrentUserObj, session: SessionDep) -> dict:
-    """Testowe powiadomienie na wszystkie urządzenia konta — do sprawdzenia, czy działa."""
-    sent = notify_user(session, user.id, "PapuTrain", "Powiadomienia działają 💪")
-    if sent == 0:
+def send_test(
+    background: BackgroundTasks, user: CurrentUserObj, session: SessionDep
+) -> dict:
+    """Testowe powiadomienie na wszystkie urządzenia konta, wysyłane po TEST_DELAY_S
+    sekundach. Odpowiedź wraca od razu; wysyłka idzie w tle (BackgroundTasks =
+    zadanie, które FastAPI uruchamia po wysłaniu odpowiedzi)."""
+    has_device = session.exec(
+        select(PushSubscription).where(PushSubscription.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
+    if has_device is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Brak aktywnych urządzeń z powiadomieniami")
-    return {"sent": sent}
+    background.add_task(_send_test_later, user.id)
+    return {"delay_s": TEST_DELAY_S}
+
+
+def _send_test_later(user_id: int) -> None:
+    time.sleep(TEST_DELAY_S)
+    # Sesja z żądania jest już zamknięta — zadanie w tle otwiera własną.
+    with Session(engine) as session:
+        notify_user(session, user_id, "PapuTrain", "Powiadomienia działają 💪")
